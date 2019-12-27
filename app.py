@@ -94,6 +94,45 @@ def getRoots(y1, y2):
     plt.close()
     return solutions
 
+def integrate(func, x0, tspan, parameters, stepsize=0.01, method='rk45'):
+    methoddict = {'rk45':rk45,
+                  'euler':euler}
+    xprev = x0
+    t0 = min(tspan)
+    tmax = max(tspan)
+    size = int(tmax/stepsize)
+    timecourse = np.zeros(shape=(size, len(x0)))
+    t = t0
+    counter = 0
+    divide = False
+    while counter < size:
+        dX = func(xprev, t, parameters)
+        x = []
+        x = xprev + stepsize*(methoddict[method](func, xprev, t, stepsize, parameters))
+        # cycb
+        if x[1] < 0.1 and timecourse[counter-1,1] >0:# and division = False:
+            divide = True
+            #x = [v/2. for v in x]
+        if divide is True:
+            x[5] = 0.6 # mass
+            divide = False
+        xprev = x
+        t += stepsize
+        timecourse[counter,: ] = x
+        counter += 1
+    return(timecourse)
+
+def euler(function, x, t, args):
+    dx = function(x, t, args)
+    return dx
+
+def rk45(function, x, t, stepsize, args):
+    k1 = function(x, t, args)
+    k2 = function(x + k1*stepsize/2., t + stepsize/2, args)
+    k3 = function(x + k2*stepsize/2., t + stepsize/2., args)
+    k4 = function(x + k3*stepsize/2., t + stepsize, args)
+    return(k1 + 2.*k2 + 2.*k3 + k4)/6.
+
 def fig1model(X, t, args):
     m = args['m']
     k1 = args['k1']
@@ -229,22 +268,24 @@ def fullmodel(X, t, args):
     k9 = args['k9']
     k10 = args['k10']
     cdh1, cycb, cdc20t, cdc20a, iep, m = X
-    if cycb < 0.1:
-        m = m/2.
-
+    # if cycb < 0.1:
+    #     m = m/2.
     dcdh1 = ((k3d + k3dd*cdc20a)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
     dcycb = k1- (k2d + k2dd * cdh1)*cycb    
     dcdc20t = k5d + k5dd*( (cycb*m/J5)**n /(1+ (cycb*(m/J5))**n )) - k6*cdc20t
     dcdc20a = (k7*iep*(cdc20t-cdc20a)/(J7 + cdc20t - cdc20a)) - (k8*Mad*cdc20a)/(J8+cdc20a) - k6*cdc20a
     diep = k9*m*cycb*(1-iep) - k10*iep
     dm = mu*m*(1-m/mstar)
-    return([dcdh1, dcycb, dcdc20t, dcdc20a, diep, dm])
+    return np.array(([dcdh1, dcycb, dcdc20t, dcdc20a, diep, dm]))
 
 def plottimecourses(parameters):
-    x0 = [1.0, 0.05,1.5, 1.4, 0.7, 0.6]
-    t= np.linspace(0, 300, 3000)
-    y = odeint(fullmodel,x0, t, args=(parameters,))
-    f , ax = plt.subplots(3,1)
+    x0 = [1.0, 0.5,1.5, 1.4, 0.7, 0.6]
+    stepsize = 0.01
+    tmax = 160
+    t= np.linspace(0, tmax, int(tmax/stepsize))
+    #y = odeint(fullmodel,x0, t, args=(parameters,))
+    y = integrate(fullmodel, x0, t, parameters, stepsize=stepsize)
+    f , ax = plt.subplots(3,1, figsize=(3,6))
     ax[0].plot(t,y[:,5], label='m')
     ax[0].legend()
     ax[1].plot(t,y[:,0], label='Cdh1')
@@ -253,9 +294,38 @@ def plottimecourses(parameters):
     ax[2].plot(t,y[:,2], label='Cdc20T')
     ax[2].plot(t,y[:,3], label='Cdc20A')
     ax[2].plot(t,y[:,4], label='IEP')        
+    ax[2].set_ylim([0,1.8])
     ax[2].legend()
-
     st.pyplot()
+
+def makeIntroPage():
+    with open('markdown/intro.md','r') as infile:
+        introtext = ''.join(infile.readlines())
+    st.markdown(introtext)
+    # st.markdown("TLDR: This project seeks to make a series of abstract models of "
+    # "the eukaryotic cell cycle accessble to the non-modelers. The content is organized "
+    # "as per the ideas developed in [Tyson and Novak, 2001](https://www.ncbi.nlm.nih.gov/pubmed/11371178). "
+    # "This interactive site is meant to be an educational tool, aimed at anyone who has been exposed to"
+    # " the basic concepts of eukaroytic mitosis, and is curious about the utility of mathematical models "
+    # "in making sense of complex biological processes.")
+
+    # st.subheader("What are the cell cycle models all about?")
+
+    # st.subheader("Why did you make this?")
+    # st.markdown("The prototypical mathematical model of biological systems still seems to be the "
+    # "Lotka-Volterra predator-prey model, from the 20th century. The curious student with an interest in molecular "
+    # "biology *may* have come across the [reprissilator](https://en.wikipedia.org/wiki/Repressilator)."
+    # " I believe that there is still a general lack of awareness of the success of mathematical models  of cellular processes, "
+    # "ranging from the cell cycle, to circadian oscillations, to autophagy, and even dynamical models of cancer. "
+    # "While there are general purpose tools [Cell Collective](https://cellcollective.org/#) that provide platforms to lower the barrier to entry"
+    # " to these theoretical models, I have not come "
+    # "across a curated, interactive resource exploring any of these models in depth. This is my attempt at "
+    # "creating such a tool, focussed on the highly successful work by Tyson and Novak in the last couple of decades"
+    # "on the yeast cell cycle."
+    # "\n"
+    # "\n"
+    # "Please feel free to reach out with any feedback and comments at jamogh [at] vt [dot] edu, or on twitter [@amogh_jalihal](https://twitter.com/amogh_jalihal), "
+    # "or by creating an issue on this project's [github repository](https://github.com/amoghpj/cell-cycle-models).")
 
 def main():
     # parameterdict
@@ -300,7 +370,10 @@ def main():
         'mstar':10,
     }
 
-    page = st.sidebar.selectbox('Choose Model',['Simplified Cdh1-CycB model', 'Hysteresis in transitions','Full Model'])
+    page = st.sidebar.selectbox('Jump to...',['Introduction','Simplified Cdh1-CycB model', 'Hysteresis in transitions','Full Model'])
+    if page == 'Introduction':
+        st.header('Introduction')
+        makeIntroPage()
     if page == 'Simplified Cdh1-CycB model':
         st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
         makeFig2(parameters)
