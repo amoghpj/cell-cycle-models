@@ -176,11 +176,6 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
        return([dcdh1, dcycb])
 
  #+end_src
-** Bifurcation
-#+begin_src python
-def makeFig3():
-    return
-#+end_src
 ** CyclinB/CDK-Cdh1/APC antagonism
  #+begin_src python
    def cycbnc_fig2(cdh1, parameters):
@@ -195,32 +190,53 @@ def makeFig3():
        return cycb
 
    def makeFig2(parameters):
-       st.markdown("$\\frac{d[CycB]}{dt} = k_1 - (k_2' + k_2'' [Cdh1])[CycB]$")
-       st.markdown("$\\frac{d[Cdh1]}{dt} = \\frac{(k_3' + k_3'' A)(1- [Cdh1])}{J_3 + 1 - [Cdh1]} - \\frac{k_4 m [CycB] [Cdh1]}{J_4 + [Cdh1]}$")
-       Cdh1_i = st.slider(label='Cdh1', min_value=0.0, max_value=1.0, value=0.1,step=0.1)
-       CycB_i = st.slider(label='log(CycB)', min_value=-2., max_value=1., value=1e-1,step=0.1)
-       mval = st.slider(label='Mass', min_value=0.3, max_value=0.7, value=0.3,step=0.01)    
-       parameters['m'] = mval
+       with open('./markdown/two-variable-timecourse.md','r') as infile:
+           sec1text = ''.join(infile.readlines())
+       st.markdown(sec1text)
+       ####################################
+       ### Time courses
+       Cdh1_i = st.slider(label='Cdh1',key='cdh1fig2tc', min_value=0.0, max_value=1.0, value=0.87,step=0.051)
+       CycB_i = st.slider(label='log(CycB)',key='cdh1fig2tc', min_value=-2., max_value=1., value=-1.8,step=0.1)
+       mval = st.slider(label='Mass', key='massfig2tc',min_value=0.3, max_value=0.7, value=0.3,step=0.01)    
+       f, ax = plt.subplots(1,1)
+       t = np.linspace(0,100,500)
        cdh1 = np.logspace(-6,0.1,8000)
+       parameters['m'] =  mval
+       y = odeint(fig1model, [Cdh1_i, 10**CycB_i],t,args=(parameters,))
+       ax.plot(t, y[:,0],'k', label = 'Cdh1')
+       ax.set_ylim(0,1.0)
+       ax1 = ax.twinx()
+       ax.set_ylabel('[Cdh1]')
+       ax.set_xlabel('time (min)')
+       ax1.set_ylabel('[CycB]')
+       ax1.plot(t, y[:,1],'k--', label = 'CycB')
+       ax1.set_ylim(1e-2,10.)
+       ax1.set_yscale('log')
+       ax.legend()
+       ax1.legend()
+       ax.set_title('mass = ' + str(round(mval, 2)))
+       st.pyplot()
+       plt.close()
+
+       ###################################
+       ### Nullclines
+       with open('./markdown/two-variable-nullcline.md','r') as infile:
+           sec1text = ''.join(infile.readlines())
+       st.markdown(sec1text)
+       Cdh1_i = st.slider(label='Cdh1',key='cdh1fig2nc', min_value=0.0, max_value=1.0, value=0.9,step=0.1)
+       CycB_i = st.slider(label='log(CycB)', key='cycbfig2nc',min_value=-2., max_value=1., value=-1.9,step=0.1)
+       mval = st.slider(label='Mass', key='massfig2nc',min_value=0.3, max_value=0.7, value=0.3,step=0.01)    
+       parameters['m'] = mval
+
        cycb1 = cycbnc_fig2(cdh1, parameters)
        cycb2 = cdh1nc_fig2(cdh1, parameters)
        parameters['m'] =  mval
        solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
        plt.close()
-       t = np.linspace(0,100,500)
+
        y = odeint(fig1model, [Cdh1_i, 10**CycB_i],t,args=(parameters,))
 
-       # Root finding
        f, ax = plt.subplots(1,1)
-       # # make phaseplane                                #
-       # gridsize = 10                                    #
-       # xlim= np.linspace(0,1., gridsize)                #
-       # ylim = np.logspace(-2, 1., gridsize)             #
-       # #makePP(fig1model,xlim, ylim, ax, gridsize,args) #
-       # for i in range(len(cdh1)):
-       #     if abs(cycb1[i] - cycb2[i]) < 10.**(np.ceil(np.log10(min(cycb1[i],cycb2[i])))-2):
-       #         ax.plot(cdh1[i],np.log10(cycb1[i]), 'ko')
-
        ax.plot(cdh1,np.log10(cycb1), 'b', label='CycB nullcline')
        ax.plot(cdh1,np.log10(cycb2), 'r', label='Cdh1 nullcline')
        ax.plot(Cdh1_i,CycB_i,'ko')
@@ -229,7 +245,8 @@ def makeFig3():
 
        for s in solutions:
            ax.plot(cdh1[s], np.log10(cycb1[s]), 'go')
-
+       ax.annotate("G1",(0.9,-1))
+       ax.annotate("S/G2/M",(0.01,0.1))
        ax.set_ylabel('log([CycB])')
        ax.set_xlabel('[Cdh1]')
        ax.set_xlim([-0.05,1.01]) 
@@ -238,15 +255,11 @@ def makeFig3():
 
        plt.tight_layout()
        st.pyplot()
-
-       # f, ax = plt.subplots(1,1)
-       # ax.plot(t, y[:,0], 'r', label='Cdh1')
-       # ax.plot(t, np.log10(y[:,1]), 'b', label='CycB')
-       # ax.set_xlabel('time')
-       # ax.set_ylabel('[X]')       
-       # ax.legend()
-       # plt.tight_layout()
-       # st.pyplot()
+       #####################################3
+       ### Conclusions
+       with open('./markdown/two-variable-conclusion.md','r') as infile:
+           sec1text = ''.join(infile.readlines())
+       st.markdown(sec1text)
 
  #+end_src
 
@@ -255,9 +268,9 @@ def makeFig3():
 ** Hystersis
 #+begin_src python
   def makeFig3(parameters):       
-      mvals = np.linspace(0.01,0.9,500)
+      mvals = np.linspace(0.05,0.6,250)
 
-      cdh1 = np.logspace(-4, 0.1, 7000)
+      cdh1 = np.append(np.logspace(-9, -4, 4000), np.logspace(-4,0.1,1000))
       hyst = []
       pvals = []
       for m in mvals:
@@ -266,18 +279,18 @@ def makeFig3():
           cycb1 = cycbnc_fig2(cdh1, parameters)
           cycb2 = cdh1nc_fig2(cdh1, parameters)
           solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
+          #pvals.append(p)
           for s in solutions:
-              hyst.append(cycb1[s])
+              hyst.append(np.log10(cycb1[s]))
               pvals.append(p)
+      # plt.plot(mvals,pvals)
       plt.plot(pvals, hyst,'k.')
+      # plt.xlabel('m')
+      # plt.ylabel('p')
       plt.xlabel('p')
       plt.ylabel('[CycB]')
       st.pyplot()
 
-#+end_src
-** Activation of Cdh1/APC at Anaphase
-#+begin_src python
-#def makeFig4(parameters):
 #+end_src
 ** Full model
 *** definition
@@ -328,7 +341,7 @@ def makeFig3():
       t= np.linspace(0, tmax, int(tmax/stepsize))
       #y = odeint(fullmodel,x0, t, args=(parameters,))
       y = integrate(fullmodel, x0, t, parameters, stepsize=stepsize)
-      f , ax = plt.subplots(3,1, figsize=(3,6))
+      f , ax = plt.subplots(3,1)#, figsize=(1,3))
       ax[0].plot(t,y[:,5], label='m')
       ax[0].legend()
       ax[1].plot(t,y[:,0], label='Cdh1')
@@ -339,6 +352,7 @@ def makeFig3():
       ax[2].plot(t,y[:,4], label='IEP')        
       ax[2].set_ylim([0,1.8])
       ax[2].legend()
+      plt.tight_layout()
       st.pyplot()
 #+end_src
 ** Make introduction
@@ -393,37 +407,67 @@ def makeFig3():
            'mstar':10,
        }
 
-       page = st.sidebar.selectbox('Jump to...',['Introduction','Simplified Cdh1-CycB model', 'Hysteresis in transitions','Full Model'])
+       page = st.sidebar.selectbox('Jump to...',['Introduction',
+                                                 'Cdh1-CycB Antagonism',
+                                                 'Hysteresis in transitions',
+                                                 'Regulation of Cdh1/APC',
+                                                 'A primitive model',
+                                                 'The yeast cell cycle'])
        if page == 'Introduction':
            st.header('Introduction')
            makeIntroPage()
-       if page == 'Simplified Cdh1-CycB model':
-           st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
+       if page == 'Cdh1-CycB Antagonism':
+           # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
            makeFig2(parameters)
        if page == 'Hysteresis in transitions':
            st.header('Hystersis underlies cell state transitions')
-           makeFig3(parameters)
-       if page == 'Full Model':
+           st.markdown('in progress...')
+           #makeFig3(parameters)
+       if page == 'A primitive model':
            st.header('Full Model')
            plottimecourses(parameters)
+       if page == 'The yeast cell cycle':
+           st.header('The Yeast cell cycle')
+           st.markdown('under construction')
+           #plottimecourses(parameters)
    if __name__ == '__main__':
        main()
  #+end_src
 
  #+RESULTS:
 
-* Text
+* Markdown Text
+** Intro
 #+begin_src markdown :tangle markdown/intro.md
   TLDR; This project seeks to make a series of abstract models of the
-  eukaryotic cell cycle accessble to the non-modelers. The content is
+  eukaryotic cell cycle accessble to non-modelers. The content is
   organized as per the ideas developed in [Tyson and Novak,
   2001](https://www.ncbi.nlm.nih.gov/pubmed/11371178).  This interactive
   site is meant to be an educational tool, aimed at anyone who has been
   exposed to the basic concepts of eukaroytic mitosis, and is curious
   about the utility of mathematical models in making sense of complex
-  biological processes.)
+  biological processes.
 
   ## What are the cell cycle models all about?
+  All cells go through a cycle of events where they grow and divide:
+  when the cell judges that there is sufficient nutrition available in the
+  environment, it commits to duplicating its genome (S phase). Following 
+  a gap phase where the cell ensures that the DNA is not damaged(G2 phase),
+  the cell commits to dividing into two daughter cells. What follows is 
+  an intricate orchestra of cellular events: the genome is first condensed
+  into chromosomes, an elaborate microtubule spindle assembles around the nucleus,
+  which then pull apart the duplicated sister chromatids to the poles of the cell.
+  Finally, the entire cell divides, partitioning its organelles and cytoplasm
+  between its daughters. The daughter cell, at the end of mitosis, waits
+  to judge the environment, waiting in G1, waiting to commit to another cycle of growth
+  and division...
+
+  Underneath this clockwork of events lies a network of signals, molecular signals,
+  that act like semaphores, *committing* the cell to the next phase of the cell cycle.
+  How does this molecular network make these irreversible decisions? Tyson and Novak
+  explore this question in a series of mathematical models, adding molecular
+  complexity at each stage, investigating the origins of cellular decision making. 
+  Use the tabs on the left to explore them!
 
   ## Why did you make this?
   The prototypical mathematical model of biological systems still seems
@@ -448,15 +492,82 @@ def makeFig3():
 
   twitter: [@amogh_jalihal](https://twitter.com/amogh_jalihal)
 
-  github: this project's [github repository](https://github.com/amoghpj/cell-cycle-models).)
+  github: this project's [github repository](https://github.com/amoghpj/cell-cycle-models)
 #+end_src
-* [2/6] Tasks
+** two variable model
+#+begin_src markdown :tangle markdown/two-variable-timecourse.md
+## The CycB/Cdk1-Cdh1/APC antagonism
+We'll start at the end, the exit from mitosis. 
+
+There are two players that coordinate the end of cell division, and the
+entry into G1, namely the CycB-bound Cdk1 [kinase](https://www.uniprot.org/keywords/KW-0418), 
+and the Cdh1 bound APC [ubiquitin ligase](https://www.sciencedirect.com/topics/neuroscience/anaphase-promoting-complex)
+The rise in activity of the CycB/Cdk1 kinase pushes the 
+cell into mitosis, spcifically into the S/G2/M phases. CycB/Cdk1
+phosphorylate Cdh1 and prevent its binding to APC. In opposition,
+Cdh1/APC target CycB/Cdk1 for degradation. The switch from S/G2/M to
+G1 phase happens when CycB/Cdk1 is degraded, and Cdh1/APC activity is high.
+
+
+These opposing forces can be modeled using a pair of non-linear ODEs, with kinetic
+parameters: the *k*s are rate constants, and the *J*s are the Michaelis constants.
+
+$\frac{d[\text{CycB}]}{dt} = k_1 - (k_2' + k_2'' [\text{Cdh1}])[\text{CycB}]$
+
+$\frac{d[\text{Cdh1}]}{dt} = \frac{(k_3' + k_3'' A)(1- [\text{Cdh1}])}{J_3 + 1 - [\text{Cdh1}]} - \frac{k_4 m [\text{CycB}] [\text{Cdh1}]}{J_4 + [\text{Cdh1}]}$
+
+Notice the *m* in the Cdh1 equation: it denotes the *mass* of the cell. 
+The numerical solution of the above equations, the timecourses of Cdh1 (solid) and CycB (dashed),
+ are plotted below. Notice the logarithmic scale of CycB activity.
+The default values of these sliders (high Cdh1, low CycB, low mass) indicate that
+the cell has just divided. Try increasing the mass to, and beyond, a value of 0.53.
+To get a sense of how the mass affects the *dynamics* of these two opposing 
+molecular factors, use the sliders to set the initial conditions of Cdh1, and CycB, and
+vary the mass to see where these requlators end up at the end of the time course.
+#+end_src
+#+begin_src markdown :tangle markdown/two-variable-nullcline.md
+  You will notice that there is a dramatic switch when mass hits a threshold,
+   suddenly CycB shoots up, and Cdh1 goes down. At this point the cell has
+  committed to the S/G2/M phases, and is ready to divide. But since division
+  results in the *mass* of the cell dividing into its daughters, use the slider
+  to set *m* to a low value  again. Notice that the configurations of CycB and Cdh1
+  have flipped again.
+
+  The exercise above shows the effect of mass on the CycB-Cdh1
+  antagonism.  In order to get a sense of how this two-component system
+  behaves in general, the plot below shows the nullclines of this
+  system, that is, how Cdh1 (red) and CycB (blue) behave at steady
+  state. The intersection of these curves (green dots) indicate the
+  "fixed points" of the system, i.e. any trajectory will either be
+  attracted to, or repelled by these points. Initially, the system has
+  three "solutions": The one on the right is the G1 attractor. (It is an
+  attractor, becasue the trajectory (starting at high Cdh1, low CycB,
+  low mass) ends up falling into the green point). The one on the left
+  is the S/G2/M attractor. 
+
+  Use the sliders to increase the mass slowly, and observe the behavior of
+  the green dots, and the trajectory (dashed line). Is the fixed point in 
+  the middle an attractor or a repeller? What does the stability of this point
+  mean for the two other fixed points?
+#+end_src
+
+#+begin_src markdown :tangle markdown/two-variable-conclusion.md
+You should see the two fixed points on the right collide and disappear, at which
+point the trajectory again dramatically slides along the Cdh1 nullcline, and
+falls into the S/G2/M state.
+
+Notice how the solutions of the intersecting nullclines depend on the value of the mass.
+In the next section, we will plot these possible solutions directly as a function
+of increase mass.
+#+end_src
+
+* [4/6] Tasks
 - [X] Make function to toggle phase plane
   - This doesn't really work in the log space plot.
     Might consider enabling it for general in a different app.
 - [X] Read about simple numerical root finding
-- [ ] Read paper and come up with an outline for a story
-- [ ] Write some explanatory text. Doesn't have to be perfect, can be refined later.
+- [X] Read paper and come up with an outline for a story
+- [X] Write some explanatory text. Doesn't have to be perfect, can be refined later.
 - [ ] Add sections to develop story.
 - [ ] If possible reimplement some plots using native streamlit
 

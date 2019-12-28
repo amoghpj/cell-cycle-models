@@ -151,9 +151,6 @@ def fig1model(X, t, args):
     dcdh1 = ((k3d + k3dd*A)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
     return([dcdh1, dcycb])
 
-def makeFig3():
-    return
-
 def cycbnc_fig2(cdh1, parameters):
     beta = parameters['k1']/parameters['k2dd']
     J = parameters['k2d']/parameters['k2dd']
@@ -166,32 +163,53 @@ def cdh1nc_fig2(cdh1,parameters):
     return cycb
 
 def makeFig2(parameters):
-    st.markdown("$\\frac{d[CycB]}{dt} = k_1 - (k_2' + k_2'' [Cdh1])[CycB]$")
-    st.markdown("$\\frac{d[Cdh1]}{dt} = \\frac{(k_3' + k_3'' A)(1- [Cdh1])}{J_3 + 1 - [Cdh1]} - \\frac{k_4 m [CycB] [Cdh1]}{J_4 + [Cdh1]}$")
-    Cdh1_i = st.slider(label='Cdh1', min_value=0.0, max_value=1.0, value=0.1,step=0.1)
-    CycB_i = st.slider(label='log(CycB)', min_value=-2., max_value=1., value=1e-1,step=0.1)
-    mval = st.slider(label='Mass', min_value=0.3, max_value=0.7, value=0.3,step=0.01)    
-    parameters['m'] = mval
+    with open('./markdown/two-variable-timecourse.md','r') as infile:
+        sec1text = ''.join(infile.readlines())
+    st.markdown(sec1text)
+    ####################################
+    ### Time courses
+    Cdh1_i = st.slider(label='Cdh1',key='cdh1fig2tc', min_value=0.0, max_value=1.0, value=0.87,step=0.051)
+    CycB_i = st.slider(label='log(CycB)',key='cdh1fig2tc', min_value=-2., max_value=1., value=-1.8,step=0.1)
+    mval = st.slider(label='Mass', key='massfig2tc',min_value=0.3, max_value=0.7, value=0.3,step=0.01)    
+    f, ax = plt.subplots(1,1)
+    t = np.linspace(0,100,500)
     cdh1 = np.logspace(-6,0.1,8000)
+    parameters['m'] =  mval
+    y = odeint(fig1model, [Cdh1_i, 10**CycB_i],t,args=(parameters,))
+    ax.plot(t, y[:,0],'k', label = 'Cdh1')
+    ax.set_ylim(0,1.0)
+    ax1 = ax.twinx()
+    ax.set_ylabel('[Cdh1]')
+    ax.set_xlabel('time (min)')
+    ax1.set_ylabel('[CycB]')
+    ax1.plot(t, y[:,1],'k--', label = 'CycB')
+    ax1.set_ylim(1e-2,10.)
+    ax1.set_yscale('log')
+    ax.legend()
+    ax1.legend()
+    ax.set_title('mass = ' + str(round(mval, 2)))
+    st.pyplot()
+    plt.close()
+
+    ###################################
+    ### Nullclines
+    with open('./markdown/two-variable-nullcline.md','r') as infile:
+        sec1text = ''.join(infile.readlines())
+    st.markdown(sec1text)
+    Cdh1_i = st.slider(label='Cdh1',key='cdh1fig2nc', min_value=0.0, max_value=1.0, value=0.9,step=0.1)
+    CycB_i = st.slider(label='log(CycB)', key='cycbfig2nc',min_value=-2., max_value=1., value=-1.9,step=0.1)
+    mval = st.slider(label='Mass', key='massfig2nc',min_value=0.3, max_value=0.7, value=0.3,step=0.01)    
+    parameters['m'] = mval
+
     cycb1 = cycbnc_fig2(cdh1, parameters)
     cycb2 = cdh1nc_fig2(cdh1, parameters)
     parameters['m'] =  mval
     solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
     plt.close()
-    t = np.linspace(0,100,500)
+
     y = odeint(fig1model, [Cdh1_i, 10**CycB_i],t,args=(parameters,))
 
-    # Root finding
     f, ax = plt.subplots(1,1)
-    # # make phaseplane                                #
-    # gridsize = 10                                    #
-    # xlim= np.linspace(0,1., gridsize)                #
-    # ylim = np.logspace(-2, 1., gridsize)             #
-    # #makePP(fig1model,xlim, ylim, ax, gridsize,args) #
-    # for i in range(len(cdh1)):
-    #     if abs(cycb1[i] - cycb2[i]) < 10.**(np.ceil(np.log10(min(cycb1[i],cycb2[i])))-2):
-    #         ax.plot(cdh1[i],np.log10(cycb1[i]), 'ko')
-
     ax.plot(cdh1,np.log10(cycb1), 'b', label='CycB nullcline')
     ax.plot(cdh1,np.log10(cycb2), 'r', label='Cdh1 nullcline')
     ax.plot(Cdh1_i,CycB_i,'ko')
@@ -200,7 +218,8 @@ def makeFig2(parameters):
 
     for s in solutions:
         ax.plot(cdh1[s], np.log10(cycb1[s]), 'go')
-
+    ax.annotate("G1",(0.9,-1))
+    ax.annotate("S/G2/M",(0.01,0.1))
     ax.set_ylabel('log([CycB])')
     ax.set_xlabel('[Cdh1]')
     ax.set_xlim([-0.05,1.01]) 
@@ -209,20 +228,16 @@ def makeFig2(parameters):
 
     plt.tight_layout()
     st.pyplot()
-
-    # f, ax = plt.subplots(1,1)
-    # ax.plot(t, y[:,0], 'r', label='Cdh1')
-    # ax.plot(t, np.log10(y[:,1]), 'b', label='CycB')
-    # ax.set_xlabel('time')
-    # ax.set_ylabel('[X]')       
-    # ax.legend()
-    # plt.tight_layout()
-    # st.pyplot()
+    #####################################3
+    ### Conclusions
+    with open('./markdown/two-variable-conclusion.md','r') as infile:
+        sec1text = ''.join(infile.readlines())
+    st.markdown(sec1text)
 
 def makeFig3(parameters):       
-    mvals = np.linspace(0.01,0.9,500)
+    mvals = np.linspace(0.05,0.6,250)
 
-    cdh1 = np.logspace(-4, 0.1, 7000)
+    cdh1 = np.append(np.logspace(-9, -4, 4000), np.logspace(-4,0.1,1000))
     hyst = []
     pvals = []
     for m in mvals:
@@ -231,15 +246,17 @@ def makeFig3(parameters):
         cycb1 = cycbnc_fig2(cdh1, parameters)
         cycb2 = cdh1nc_fig2(cdh1, parameters)
         solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
+        #pvals.append(p)
         for s in solutions:
-            hyst.append(cycb1[s])
+            hyst.append(np.log10(cycb1[s]))
             pvals.append(p)
+    # plt.plot(mvals,pvals)
     plt.plot(pvals, hyst,'k.')
+    # plt.xlabel('m')
+    # plt.ylabel('p')
     plt.xlabel('p')
     plt.ylabel('[CycB]')
     st.pyplot()
-
-#def makeFig4(parameters):
 
 def fullmodel(X, t, args):
     k1 = args['k1']
@@ -285,7 +302,7 @@ def plottimecourses(parameters):
     t= np.linspace(0, tmax, int(tmax/stepsize))
     #y = odeint(fullmodel,x0, t, args=(parameters,))
     y = integrate(fullmodel, x0, t, parameters, stepsize=stepsize)
-    f , ax = plt.subplots(3,1, figsize=(3,6))
+    f , ax = plt.subplots(3,1)#, figsize=(1,3))
     ax[0].plot(t,y[:,5], label='m')
     ax[0].legend()
     ax[1].plot(t,y[:,0], label='Cdh1')
@@ -296,36 +313,13 @@ def plottimecourses(parameters):
     ax[2].plot(t,y[:,4], label='IEP')        
     ax[2].set_ylim([0,1.8])
     ax[2].legend()
+    plt.tight_layout()
     st.pyplot()
 
 def makeIntroPage():
     with open('markdown/intro.md','r') as infile:
         introtext = ''.join(infile.readlines())
     st.markdown(introtext)
-    # st.markdown("TLDR: This project seeks to make a series of abstract models of "
-    # "the eukaryotic cell cycle accessble to the non-modelers. The content is organized "
-    # "as per the ideas developed in [Tyson and Novak, 2001](https://www.ncbi.nlm.nih.gov/pubmed/11371178). "
-    # "This interactive site is meant to be an educational tool, aimed at anyone who has been exposed to"
-    # " the basic concepts of eukaroytic mitosis, and is curious about the utility of mathematical models "
-    # "in making sense of complex biological processes.")
-
-    # st.subheader("What are the cell cycle models all about?")
-
-    # st.subheader("Why did you make this?")
-    # st.markdown("The prototypical mathematical model of biological systems still seems to be the "
-    # "Lotka-Volterra predator-prey model, from the 20th century. The curious student with an interest in molecular "
-    # "biology *may* have come across the [reprissilator](https://en.wikipedia.org/wiki/Repressilator)."
-    # " I believe that there is still a general lack of awareness of the success of mathematical models  of cellular processes, "
-    # "ranging from the cell cycle, to circadian oscillations, to autophagy, and even dynamical models of cancer. "
-    # "While there are general purpose tools [Cell Collective](https://cellcollective.org/#) that provide platforms to lower the barrier to entry"
-    # " to these theoretical models, I have not come "
-    # "across a curated, interactive resource exploring any of these models in depth. This is my attempt at "
-    # "creating such a tool, focussed on the highly successful work by Tyson and Novak in the last couple of decades"
-    # "on the yeast cell cycle."
-    # "\n"
-    # "\n"
-    # "Please feel free to reach out with any feedback and comments at jamogh [at] vt [dot] edu, or on twitter [@amogh_jalihal](https://twitter.com/amogh_jalihal), "
-    # "or by creating an issue on this project's [github repository](https://github.com/amoghpj/cell-cycle-models).")
 
 def main():
     # parameterdict
@@ -370,18 +364,28 @@ def main():
         'mstar':10,
     }
 
-    page = st.sidebar.selectbox('Jump to...',['Introduction','Simplified Cdh1-CycB model', 'Hysteresis in transitions','Full Model'])
+    page = st.sidebar.selectbox('Jump to...',['Introduction',
+                                              'Cdh1-CycB Antagonism',
+                                              'Hysteresis in transitions',
+                                              'Regulation of Cdh1/APC',
+                                              'A primitive model',
+                                              'The yeast cell cycle'])
     if page == 'Introduction':
         st.header('Introduction')
         makeIntroPage()
-    if page == 'Simplified Cdh1-CycB model':
-        st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
+    if page == 'Cdh1-CycB Antagonism':
+        # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
         makeFig2(parameters)
     if page == 'Hysteresis in transitions':
         st.header('Hystersis underlies cell state transitions')
-        makeFig3(parameters)
-    if page == 'Full Model':
+        st.markdown('in progress...')
+        #makeFig3(parameters)
+    if page == 'A primitive model':
         st.header('Full Model')
         plottimecourses(parameters)
+    if page == 'The yeast cell cycle':
+        st.header('The Yeast cell cycle')
+        st.markdown('under construction')
+        #plottimecourses(parameters)
 if __name__ == '__main__':
     main()
