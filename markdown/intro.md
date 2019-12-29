@@ -7,6 +7,7 @@ exposed to the basic concepts of eukaroytic mitosis, and is curious
 about the utility of mathematical models in making sense of complex
 biological processes.
 
+
 ## What are the cell cycle models all about?
 All cells go through a cycle of events where they grow and divide:
 when the cell judges that there is sufficient nutrition available in the
