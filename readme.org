@@ -1,3 +1,5 @@
-Curious about compuational cell biology? Want to learn more about the cell cycle? Want to see a cool application of mathematical modeling in biology? Check out [[http://cellcyclemoderls.herokuapp.com]]!
+Curious about compuational cell biology? Want to learn more about the cell cycle? Want to see a cool application of mathematical modeling in biology? Check out [[http://cellcyclemodels.herokuapp.com]]!
 
 Please feel free to open issues with suggestions and corrections!
+
+This app was made using streamlit.io, and is based on Tyson and Novak, 2001, JTB.
