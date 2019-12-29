@@ -1,0 +1,3 @@
+Curious about compuational cell biology? Want to learn more about the cell cycle? Want to see a cool application of mathematical modeling in biology? Check out [[http://cellcyclemoderls.herokuapp.com]]!
+
+Please feel free to open issues with suggestions and corrections!
