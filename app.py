@@ -671,6 +671,11 @@ def makeFig7(parameters):
         yeastdescription2 = ''.join(infile.readlines())
     st.markdown(yeastdescription2)
 
+def summary():
+    with open('markdown/summary.md','r') as infile:
+        summarytext = ''.join(infile.readlines())
+    st.markdown(summarytext)
+
 def makeIntroPage():
     # gifpath = r''' <img src="./data/budding.gif">''' # 
     # st.write(gifpath, unsafe_allow_html=True)

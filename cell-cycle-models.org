@@ -939,6 +939,13 @@ Use the drop down menu to simulate this triple deletion strain.
 viable, it *rescues* the *cln1 cln2* G1 arrest phenotype!
 #+end_src
 ** Summary
+** make summary
+#+begin_src python
+def summary():
+    with open('markdown/summary.md','r') as infile:
+        summarytext = ''.join(infile.readlines())
+    st.markdown(summarytext)
+#+end_src
 *** text
 #+begin_src markdown :tangle markdown/summary.md
 It is now nearly two decades after the perspective piece by Tyson and Novak 
