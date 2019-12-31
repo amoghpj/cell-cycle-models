@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.integrate import odeint
 from io import BytesIO
 import streamlit as st
+from PIL import Image
 import time
 
 def lotkavolterra(X, t, args):
@@ -171,7 +172,8 @@ def integrate(func, x0, tspan, parameters, massindex=5,stepsize=0.01, method='rk
         if x[massindex]> 0.8:
             growing = True
         if x[1] < 0.1 and growing == True:
-            x[massindex] = 0.6 # mass
+            x[massindex] = x[massindex]/2. # mass
+            #x[massindex] = 0.4 # mass
             growing = False
         xprev = x
         t += stepsize
@@ -189,24 +191,6 @@ def rk45(function, x, t, stepsize, args):
     k3 = function(x + k2*stepsize/2., t + stepsize/2., args)
     k4 = function(x + k3*stepsize/2., t + stepsize, args)
     return(k1 + 2.*k2 + 2.*k3 + k4)/6.
-
-def fig1model(X, t, args):
-    m = args['m']
-    k1 = args['k1']
-    k2d = args['k2d']
-    k2dd = args['k2dd']
-    k2ddd = args['k2ddd']
-    k3d = args['k3d']
-    k3dd = args['k3dd']
-    k4d = args['k4d']
-    k4 = args['k4']
-    A = args['A']
-    J3 = args['J3']
-    J4 = args['J4']
-    cdh1, cycb = X
-    dcycb = k1- (k2d + k2dd * cdh1)*cycb
-    dcdh1 = ((k3d + k3dd*A)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
-    return([dcdh1, dcycb])
 
 def cycbnc_fig2(cdh1, parameters):
     beta = parameters['k1']/parameters['k2dd']
@@ -289,6 +273,24 @@ def makeFig2(parameters):
     with open('./markdown/two-variable-conclusion.md','r') as infile:
         sec1text = ''.join(infile.readlines())
     st.markdown(sec1text)
+
+def fig1model(X, t, args):
+    m = args['m']
+    k1 = args['k1']
+    k2d = args['k2d']
+    k2dd = args['k2dd']
+    k2ddd = args['k2ddd']
+    k3d = args['k3d']
+    k3dd = args['k3dd']
+    k4d = args['k4d']
+    k4 = args['k4']
+    A = args['A']
+    J3 = args['J3']
+    J4 = args['J4']
+    cdh1, cycb = X
+    dcycb = k1- (k2d + k2dd * cdh1)*cycb
+    dcdh1 = ((k3d + k3dd*A)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
+    return([dcdh1, dcycb])
 
 def makeFig3(parameters):       
     regenerate = False
@@ -375,25 +377,23 @@ def threevariable(X, t, args):
     k6 = args['k6']
     J5 = args['J5']
     n = args['n']
-
     cdh1, cycb, cdc20t = X
-    if cycb < 0.1:
-        m = m/2
-    dcycb = k1- (k2d + k2dd * cdh1)*cycb
     dcdh1 = ((k3d + k3dd*cdc20t)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
-    dcdc20t = k5d + k5dd*((cycb*m*J5)**n/(1 + (cycb*m*J5)**n)) - k6*cdc20t
+    dcycb = k1- (k2d + k2dd * cdh1)*cycb
+    dcdc20t = k5d + k5dd*((cycb*m/J5)**n/(1 + (cycb*m/J5)**n)) - k6*cdc20t
     return(np.array([dcdh1, dcycb, dcdc20t]))
 
 def makeFig4(parameters):
-    with open('./markdown/cdh1-activation.md','r') as infile:
+    with open('./markdown/cdh1-activation-1.md','r') as infile:
         cdh1text = ''.join(infile.readlines())
     st.markdown(cdh1text)
     cycbvals = np.append(np.logspace(-6,-3,300),np.logspace(-3,1.1,600))
-    #mval = st.slider(label='Mass', key='massfig2nc',min_value=0.4, max_value=1., value=0.4,step=0.6)    
+    # Sliders
     mval = st.selectbox(label='Mass', options=[0.4, 0.8, 1.0])
     Cdh1_i = st.slider(label='Cdh1',key='cdh1fig4tc', min_value=0.0, max_value=1.0, value=0.87,step=0.05)
-    Cdc20_i = st.slider(label='Cdc20',key='cdc20fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.05)
-    CycB_i = st.slider(label='log(CycB)',key='cdh1fig4tc', min_value=-2., max_value=0.0, value=-1.8,step=0.01)
+    Cdc20_i = st.slider(label='Cdc20',key='cdc20fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.01)
+    CycB_i = st.slider(label='log(CycB)',key='cdh1fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.01)
+    ## 
     cdc20 = [cdc20ncfig4(c, mval, parameters) for c in cycbvals ]
     pvals = (parameters['k3d'] + parameters['k3dd']*np.array(cdc20))/(parameters['k4']*mval)
     cdh1 = [cdh1ncfig4(c, p, parameters) for c,p in zip(cycbvals, pvals)]
@@ -411,9 +411,6 @@ def makeFig4(parameters):
             cycb1 = cycbnc_fig2(cdh1, parameters)
             cycb2 = cdh1nc_fig2(cdh1, parameters)
             solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
-            #solutions = getRoots(log10cycb1, cycb2)
-            # if len(solutions) >=1 and p>=0.265:
-            #    solutions = [s for s in solutions if s < 0.4] 
             for s in solutions:
                 hyst.append(cycb1[s])
                 cdc20vals.append(c)
@@ -427,8 +424,8 @@ def makeFig4(parameters):
     ax.set_ylabel('CycB')
     ax.set_ylim(0,1.0)
 
-    x0 = [Cdh1_i, 10**CycB_i, Cdc20_i]
-    tmax = 150
+    x0 = [Cdh1_i, CycB_i, Cdc20_i]
+    tmax = 50
     stepsize=0.01
     t = np.linspace(0 ,tmax, int(tmax/stepsize))
     parameters['m'] = mval
@@ -446,15 +443,22 @@ def makeFig4(parameters):
     ax.plot(df['cdc20'], df['cycb'], 'k.', label='CycB nullcline')
     ax.plot(y[:,2], y[:,1],'r--')
     ax.set_xlim([0,settings[mval]['xmax']])
+    ax.annotate('S/G2/M',(0.6,0.15))
+    ax.annotate('G1',(0.051,0.05))
     ax.legend()
     st.pyplot()
     plt.close()
-    f, ax = plt.subplots(1,1)
-    ax.plot(t, y[:,0],label='cdh1')
-    ax.plot(t, y[:,1],label='cycb')
-    ax.plot(t, y[:,2],label='cdc20')
-    ax.legend()
-    st.pyplot()
+
+    with open('./markdown/cdh1-activation-2.md','r') as infile:
+        cdh1conclude = ''.join(infile.readlines())
+    st.markdown(cdh1conclude)
+
+    # f, ax = plt.subplots(1,1)
+    # ax.plot(t, y[:,0],label='cdh1')
+    # ax.plot(t, y[:,1],label='cycb')
+    # ax.plot(t, y[:,2],label='cdc20')
+    # ax.legend()
+    # st.pyplot()
 
 def fullmodel(X, t, args):
     k1 = args['k1']
@@ -520,12 +524,190 @@ def plottimecourses(parameters):
     plt.tight_layout()
     st.pyplot()
 
+def yeastmodel(X, t, args):
+    parameters = args
+    k1 = args['k1']
+    k2d = args['k2d']
+    k2dd = args['k2dd']
+    k2ddd = args['k2ddd']
+    k3d = args['k3d']
+    k3dd = args['k3dd']
+    k4d = args['k4d']
+    k4 = args['k4']
+    A = args['A']
+    J3 = args['J3']
+    J4 = args['J4']
+    mu = args['mu']
+    J5 = args['J5']
+    Mad = args['Mad']
+    k6 = args['k6']
+    k7 = args['k7']
+    k8 = args['k8']
+    n = args['n']
+    k5d = args['k5d']
+    k5dd = args['k5dd']
+    J7 = args['J7']
+    J8 = args['J8']
+    mstar = args['mstar']
+    k9 = args['k9']
+    k10 = args['k10']
+    k11 = args['k11']
+    k12d = args['k12d']
+    k12dd = args['k12dd']
+    k12ddd = args['k12ddd']
+    k13 = args['k13']
+    k14 = args['k14']
+    k15d = args['k15d']
+    k15dd = args['k15dd']
+    k16d = args['k16d']
+    k16dd = args['k16dd']
+    Keq = args['Keq']
+    J15 = args['J15']
+    J16 = args['J16']
+    cdh1, cycbt, ckit, sk, cdc20t, cdc20a, iep, m = X
+    cycb = cycbt - trimer(cycbt, ckit, parameters)
+    dcdh1 = ((k3d + k3dd*cdc20a)*(1 - cdh1))/(J3 + 1 - cdh1) - ((k4d*sk + k4*m*cycb)*cdh1)/(J4 + cdh1)
+    dcycbt = k1- (k2d + k2dd*cdh1 + k2ddd*cdc20a)*cycbt    
+    dckit = k11 - (k12d + k12dd*sk + k12ddd*m*cycb)*ckit
+    dsk = k13*goldbeter(k15d*m + k15dd*sk, k16d + k16dd*m*cycb, J15, J16) - k14*sk
+    dcdc20t = k5d + k5dd*( (cycb*m/J5)**n /(1+ (cycb*(m/J5))**n )) - k6*cdc20t
+    dcdc20a = (k7*iep*(cdc20t-cdc20a)/(J7 + cdc20t - cdc20a)) - (k8*Mad*cdc20a)/(J8+cdc20a) - k6*cdc20a
+    diep = k9*m*cycb*(1-iep) - k10*iep
+    dm = mu*m*(1-m/mstar)
+    return np.array(([dcdh1, dcycbt, dckit, dsk, dcdc20t, dcdc20a, diep, dm]))
+
+def cdh1ncfig7(cycbt,ckit, cdc20a, m, sk, parameters):
+    cycb = cycbt - trimer(cycbt, ckit, parameters)
+    cdh1 = goldbeter(parameters['k3d'] + parameters['k3dd']*cdc20a,
+                     parameters['k4d']*sk + parameters['k4']*m*cycb,
+                     parameters['J3'],
+                     parameters['J4'])
+    return cdh1
+def cycbncfig7(cdh1, cdc20a, parameters):
+    cycbt = parameters['k1']/(parameters['k2d'] + parameters['k2dd']*cdh1 + parameters['k2ddd']*cdc20a)
+    return cycbt
+
+def ckitncfig7(cycbt, m, sk, parameters):
+    cycb = cycbt - trimer(cycbt, )
+    ckit = parameters['k11']/(parameters['k12d'] + parameters['k12dd']*sk + parameters['k12ddd']*m*cycb)
+    return ckit
+
+def trimer(cycbt, ckit, parameters):
+    tri = (2*cycbt*ckit)/(cycbt + ckit + 1./parameters['Keq'] +\
+                             np.sqrt((cycbt + ckit + 1./parameters['Keq'])**2 -4*cycbt*ckit))
+    return tri
+
+# def makeYeastPP(parameters):
+#     # TODO: understand and implement nullclines in fig 7
+    # mval = st.slider('mass', min_value=0.1, max_value=1.0,step=0.1,value=0.2)
+    # mval = 1.0
+    # parameters['m'] = mval
+    # skval = st.slider('SK', min_value=-2., max_value=0.0,step=0.5,value=-2.)    
+    # # cycbt values over which to compute cdh1 nullcline
+    # cycbvals = np.append(np.logspace(-6,-3,300),np.logspace(-3,0.0,600))
+    # ckitnc = [ckitncfig7(c, mval, 10**skval, parameters) for c in cycbvals]
+    # ckitvals = np.linspace(0., 1., 100)
+    # cdc20vals = [cdc20ncfig4(c, mval, parameters) for c in cycbvals]
+    # pvals = (parameters['k3d'] + parameters['k3dd']*np.array(cdc20vals))/(parameters['k4']*mval)
+    # cdh1 = [cdh1ncfig4(c, p, parameters) for c,p in zip(cycbvals, pvals)]
+    # cycbnc = []
+    # ckitx = []
+    # for ckit in ckitvals:
+    #     cdh1vals = [cdh1ncfig7(c, ckit, cdc20, mval, skval, parameters) for c,cdc20 in zip(cycbvals,cdc20vals)]
+    #     cycb1 = cycbncfig7(np.array(cdh1vals), np.array(cdc20vals), parameters)
+    #     cycb2 = cdh1nc_fig2(np.array(cdh1vals), parameters)
+    #     roots = getRoots(np.log10(cycb1), np.log10(cycb2))
+    #     for r in roots:
+    #         cycbnc.append(r)
+    #         ckitx.append(ckit)
+    # #cycb = [cycbncfig7(c, 0, parameters) for c in cdh1vals]
+    # f, ax = plt.subplots(1,1)
+    # ax.plot(ckitnc, cycbvals)
+    # ax.plot(ckitx, cycbnc,'k.')
+    # ax.plot(ckitnc, [cycbt - trimer(cycbt,ckit,parameters ) for cycbt, ckit in zip(cycbvals, ckitnc)])
+    # ax.set_title(str(len(cycbnc)))
+    # # ax.set_xlim(0,1)
+    # # ax.set_ylim(0,1)
+    # ax.set_ylabel('[CycB$_T$]')    
+    # ax.set_xlabel('[CKI$_T$]')
+
+def makeFig7(parameters):
+    ## time courses
+    parameters['mu'] = 0.005
+    x0 = [1.0, 0.01, 0.01, 0.04, 0.2,0.1, 0.2, 1.0]
+    tmax = 300
+    stepsize = 0.01
+    t = np.linspace(0, tmax , int(tmax/stepsize))
+    image = Image.open('data/yeast-model.png')
+    st.image(image, caption="Wiring diagram of the yeast cell cycle, "\
+             "taken from Tyson and Novak, 2001.", width=500)#use_column_width=True)
+    with open('markdown/yeast-model-1.md', 'r') as infile:
+        yeastdescription1 = ''.join(infile.readlines())
+
+    st.markdown(yeastdescription1)
+    strain  = st.selectbox(label='Select a yeast strain', options=['WT', 'SK-deletion','SK, CKI double deletion'])
+
+    if strain == 'WT':
+        pars = dict(parameters)
+    elif strain == 'SK-deletion':
+        pars = dict(parameters)
+        pars['k13'] = 0
+    elif strain == 'SK, CKI double deletion':
+        pars = dict(parameters)
+        pars['k13'] = 0
+        pars['k11'] = 0
+    y = integrate(yeastmodel,x0, t, pars, massindex=7, stepsize=stepsize)
+    f, ax = plt.subplots(2,1)
+    ax[0].plot(t, y[:,0],label='Cdh1')
+    ax[0].plot(t, y[:,1],label='Cycb$_T$')
+    ax[1].plot(t, y[:,2],label='Cki$_T$')
+    ax[1].plot(t, y[:,3],label='SK')
+    ax[1].plot(t, y[:,5],label='Cdc20$_A$')
+    ax[0].legend()
+    ax[1].legend()
+    ax[0].set_title(strain)
+    st.pyplot()
+    with open('markdown/yeast-model-2.md', 'r') as infile:
+        yeastdescription2 = ''.join(infile.readlines())
+    st.markdown(yeastdescription2)
+
 def makeIntroPage():
+    # gifpath = r''' <img src="./data/budding.gif">''' # 
+    # st.write(gifpath, unsafe_allow_html=True)
     with open('markdown/intro.md','r') as infile:
         introtext = ''.join(infile.readlines())
     #with open
     #st.image()
     st.markdown(introtext)
+
+def makePages(parameters):
+   page = st.sidebar.selectbox('Jump to...',['Introduction',
+                                             'Cdh1-CycB Antagonism',
+                                             'Hysteresis in transitions',
+                                             'Regulation of Cdh1/APC',
+                                             'A primitive model',
+                                             'The yeast cell cycle', 'Summary'])
+   if page == 'Introduction':
+       st.header('Introduction')
+       makeIntroPage()
+   if page == 'Cdh1-CycB Antagonism':
+       # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
+       makeFig2(parameters)
+   if page == 'Hysteresis in transitions':
+       st.header('Hystersis underlies cell state transitions')
+       makeFig3(parameters)
+   if page == 'Regulation of Cdh1/APC':
+       st.header('Activating the Cdh1/APC')
+       makeFig4(parameters)
+   if page == 'A primitive model':
+       st.header('Primitive Model')
+       plottimecourses(parameters)
+   if page == 'The yeast cell cycle':
+       st.header('The budding yeast cell cycle')
+       makeFig7(parameters)
+   if page == 'Summary':
+       st.header("...But there's more!")
+       summary()
 
 def main():
     # parameterdict
@@ -569,34 +751,10 @@ def main():
         'J16':0.01,
         'mstar':10,
     }
-
-    page = st.sidebar.selectbox('Jump to...',['Introduction',
-                                              'Cdh1-CycB Antagonism',
-                                              'Hysteresis in transitions',
-                                              'Regulation of Cdh1/APC',
-                                              'A primitive model',
-                                              'The yeast cell cycle','test'])
-    if page == 'Introduction':
-        st.header('Introduction')
-        makeIntroPage()
-    if page == 'Cdh1-CycB Antagonism':
-        # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
-        makeFig2(parameters)
-    if page == 'Hysteresis in transitions':
-        st.header('Hystersis underlies cell state transitions')
-        makeFig3(parameters)
-    if page == 'Regulation of Cdh1/APC':
-        st.header('Activating the Cdh1/APC')
-        makeFig4(parameters)
-    if page == 'A primitive model':
-        st.header('Primitive Model')
-        plottimecourses(parameters)
-    if page == 'The yeast cell cycle':
-        st.header('The Yeast cell cycle')
-        st.markdown('under construction')
+    makePages(parameters)
         #plottimecourses(parameters)
-    if page == 'test':
-        st.header('test')
+    # if page == 'test':
+    #     st.header('test')
         #test()
 if __name__ == '__main__':
     main()

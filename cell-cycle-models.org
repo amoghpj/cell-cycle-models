@@ -11,6 +11,7 @@ import pandas as pd
 from scipy.integrate import odeint
 from io import BytesIO
 import streamlit as st
+from PIL import Image
 import time
 #+END_SRC 
 
@@ -178,7 +179,7 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       g = (2*gamma)/(beta + np.sqrt(beta**2 - 4*alpha*gamma))
       return g
 #+end_src
-** Solver
+*** Solver
 #+begin_src python
   def integrate(func, x0, tspan, parameters, massindex=5,stepsize=0.01, method='rk45'):
       methoddict = {'rk45':rk45,
@@ -199,7 +200,8 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
           if x[massindex]> 0.8:
               growing = True
           if x[1] < 0.1 and growing == True:
-              x[massindex] = 0.6 # mass
+              x[massindex] = x[massindex]/2. # mass
+              #x[massindex] = 0.4 # mass
               growing = False
           xprev = x
           t += stepsize
@@ -218,28 +220,8 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       k4 = function(x + k3*stepsize/2., t + stepsize, args)
       return(k1 + 2.*k2 + 2.*k3 + k4)/6.
 #+end_src
-** Model definitions
- #+begin_src python
-   def fig1model(X, t, args):
-       m = args['m']
-       k1 = args['k1']
-       k2d = args['k2d']
-       k2dd = args['k2dd']
-       k2ddd = args['k2ddd']
-       k3d = args['k3d']
-       k3dd = args['k3dd']
-       k4d = args['k4d']
-       k4 = args['k4']
-       A = args['A']
-       J3 = args['J3']
-       J4 = args['J4']
-       cdh1, cycb = X
-       dcycb = k1- (k2d + k2dd * cdh1)*cycb
-       dcdh1 = ((k3d + k3dd*A)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
-       return([dcdh1, dcycb])
-
- #+end_src
 ** CyclinB/CDK-Cdh1/APC antagonism
+*** Nullclines
 #+begin_src python
    def cycbnc_fig2(cdh1, parameters):
        beta = parameters['k1']/parameters['k2dd']
@@ -251,7 +233,76 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
        p = (parameters['k3d'] + parameters['k3dd']*parameters['A'])/(parameters['k4']*parameters['m'])
        cycb = [p*((1-c)*(parameters['J4'] + c))/(c*(parameters['J3'] + 1 - c)) for c in cdh1]
        return cycb
+#+end_src
+*** two variable model - description
+ #+begin_src markdown :tangle markdown/two-variable-timecourse.md
+ ## The CycB/Cdk1-Cdh1/APC antagonism
+ We'll start at the end, the exit from mitosis. 
 
+ There are two players that coordinate the end of cell division, and the
+ entry into G1, namely the CycB-bound Cdk1 [kinase](https://www.uniprot.org/keywords/KW-0418), 
+ and the Cdh1 bound APC [ubiquitin ligase](https://www.sciencedirect.com/topics/neuroscience/anaphase-promoting-complex)
+ The rise in activity of the CycB/Cdk1 kinase pushes the 
+ cell into mitosis, spcifically into the S/G2/M phases. CycB/Cdk1
+ phosphorylate Cdh1 and prevent its binding to APC. In opposition,
+ Cdh1/APC target CycB/Cdk1 for degradation. The switch from S/G2/M to
+ G1 phase happens when CycB/Cdk1 is degraded, and Cdh1/APC activity is high.
+
+
+ These opposing forces can be modeled using a pair of non-linear ODEs, with kinetic
+ parameters: the *k*s are rate constants, and the *J*s are the Michaelis constants.
+
+ $\frac{d[\text{CycB}]}{dt} = k_1 - (k_2' + k_2'' [\text{Cdh1}])[\text{CycB}]$
+
+ $\frac{d[\text{Cdh1}]}{dt} = \frac{(k_3' + k_3'' A)(1- [\text{Cdh1}])}{J_3 + 1 - [\text{Cdh1}]} - \frac{k_4 m [\text{CycB}] [\text{Cdh1}]}{J_4 + [\text{Cdh1}]}$
+
+ Notice the *m* in the Cdh1 equation: it denotes the *mass* of the cell. 
+ The numerical solution of the above equations, the timecourses of Cdh1 (solid) and CycB (dashed),
+  are plotted below. Notice the logarithmic scale of CycB activity.
+ The default values of these sliders (high Cdh1, low CycB, low mass) indicate that
+ the cell has just divided. Try increasing the mass to, and beyond, a value of 0.53.
+ To get a sense of how the mass affects the *dynamics* of these two opposing 
+ molecular factors, use the sliders to set the initial conditions of Cdh1, and CycB, and
+ vary the mass to see where these requlators end up at the end of the time course.
+ #+end_src
+ #+begin_src markdown :tangle markdown/two-variable-nullcline.md
+   You will notice that there is a dramatic switch when mass hits a threshold,
+    suddenly CycB shoots up, and Cdh1 goes down. At this point the cell has
+   committed to the S/G2/M phases, and is ready to divide. But since division
+   results in the *mass* of the cell dividing into its daughters, use the slider
+   to set *m* to a low value  again. Notice that the configurations of CycB and Cdh1
+   have flipped again.
+
+   The exercise above shows the effect of mass on the CycB-Cdh1
+   antagonism.  In order to get a sense of how this two-component system
+   behaves in general, the plot below shows the nullclines of this
+   system, that is, how Cdh1 (red) and CycB (blue) behave at steady
+   state. The intersection of these curves (green dots) indicate the
+   "fixed points" of the system, i.e. any trajectory will either be
+   attracted to, or repelled by these points. Initially, the system has
+   three "solutions": The one on the right is the G1 attractor. (It is an
+   attractor, becasue the trajectory (starting at high Cdh1, low CycB,
+   low mass) ends up falling into the green point). The one on the left
+   is the S/G2/M attractor. 
+
+   Use the sliders to increase the mass slowly, and observe the behavior of
+   the green dots, and the trajectory (dashed line). Is the fixed point in 
+   the middle an attractor or a repeller? What does the stability of this point
+   mean for the two other fixed points?
+ #+end_src
+
+ #+begin_src markdown :tangle markdown/two-variable-conclusion.md
+ You should see the two fixed points on the right collide and disappear, at which
+ point the trajectory again dramatically slides along the Cdh1 nullcline, and
+ falls into the S/G2/M state.
+
+ Notice how the solutions of the intersecting nullclines depend on the value of the mass.
+ In the next section, we will plot these possible solutions directly as a function
+ of increase mass.
+ #+end_src
+
+*** Section layout
+#+begin_src python
    def makeFig2(parameters):
        with open('./markdown/two-variable-timecourse.md','r') as infile:
            sec1text = ''.join(infile.readlines())
@@ -326,7 +377,65 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
 
  #+RESULTS:
 
+*** Model definition
+ #+begin_src python
+   def fig1model(X, t, args):
+       m = args['m']
+       k1 = args['k1']
+       k2d = args['k2d']
+       k2dd = args['k2dd']
+       k2ddd = args['k2ddd']
+       k3d = args['k3d']
+       k3dd = args['k3dd']
+       k4d = args['k4d']
+       k4 = args['k4']
+       A = args['A']
+       J3 = args['J3']
+       J4 = args['J4']
+       cdh1, cycb = X
+       dcycb = k1- (k2d + k2dd * cdh1)*cycb
+       dcdh1 = ((k3d + k3dd*A)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
+       return([dcdh1, dcycb])
+
+ #+end_src
 ** Hystersis
+*** hysteresis - description
+ #+begin_src markdown :tangle markdown/hysteresis-1.md
+ To get a better picture of how mass affects the 
+ steady states of the system, the plot below shows
+ the CycB steady states as a function of the combination
+ of parameters and mass below.
+
+ $p = (k3d + k3dd*A)/(k4*m)$
+
+ Notice that *p* decreases as *m* increases, while *p* increases
+ with the parameter *A*, which we haven't talked about yet.
+
+ The reverse S shape of this plot indicates the hysteresis
+ in CycB activity: immediately after mitosis, the cell lies
+ in the bottom right corner. As mass increases, the system
+ moves to the left, until the G1 state disappears, and the
+ cell zooms up to the S/G2/M state. 
+
+ Use the sliders below to first increase the mass to see the
+ first irreversible decision to S/G2/M
+ #+end_src
+
+ #+begin_src markdown :tangle markdown/hysteresis-2.md
+ The cell is now undergoing mitosis. In order for it to
+ complete division and return to the G1 branch, the cell has
+ to fall off S/G2/M branch on the right. For this to happen,
+ it has to travel along this branch on the top, going to the
+ right. How does this happen? The mystery variable *A* takes
+ care of this. It represents the separation of chromatids, and
+ progress through anaphase. In the next section, we will introduce
+ another variable to represent this process, which will drive
+ the cell through cell division, causing it to fall off the 
+ S/G2/M branch *irreversibly* back to G1. Test this for yourself
+ by selecting a high CycB, low Cdh1 initial condition, and watch the
+ cell fall back to G1.
+ #+end_src
+*** Section
 #+begin_src python
   def makeFig3(parameters):       
       regenerate = False
@@ -381,6 +490,7 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       st.markdown(hyst2)
 #+end_src
 ** Cdh1 Activation
+*** nullclines
 #+begin_src python
   def cdc20ncfig4(cycb, m, parameters):
       cdc20 = (parameters['k5d'] + parameters['k5dd']*(cycb*m/parameters['J5'])**parameters['n']\
@@ -396,7 +506,9 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       J = parameters['k2d']/parameters['k2dd']
       cycb = beta/(J + cdh1) 
       return cycb
-
+#+end_src
+*** three variable model
+#+begin_src python
   def threevariable(X, t, args):
       m = args['m']
       k1 = args['k1']
@@ -415,25 +527,59 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       k6 = args['k6']
       J5 = args['J5']
       n = args['n']
-
       cdh1, cycb, cdc20t = X
-      if cycb < 0.1:
-          m = m/2
-      dcycb = k1- (k2d + k2dd * cdh1)*cycb
       dcdh1 = ((k3d + k3dd*cdc20t)*(1 - cdh1))/(J3 + 1 - cdh1) - (k4*m*cycb*cdh1)/(J4 + cdh1)
-      dcdc20t = k5d + k5dd*((cycb*m*J5)**n/(1 + (cycb*m*J5)**n)) - k6*cdc20t
+      dcycb = k1- (k2d + k2dd * cdh1)*cycb
+      dcdc20t = k5d + k5dd*((cycb*m/J5)**n/(1 + (cycb*m/J5)**n)) - k6*cdc20t
       return(np.array([dcdh1, dcycb, dcdc20t]))
+#+end_src
+*** cdh1 activation - description
+ #+begin_src markdown :tangle markdown/cdh1-activation-1.md
+   In the previous section, we had introduced an artificial 
+   variable *A* that controls the exit from mitosis. This 
+   variable acted as an activator of the Cdh1/APC activity.
+   The Cdc14 phosphatase plays this role, which is activated
+   indirectly by Cdc20/APC. Tyson and Novak simplify this
+   mechanism, by directly considering the Cdc20 activity.
+   The following equation models the rise in Cdc20/APC
+   activity in the S/G2/M phase by introducing a Hill-like
+   dependence on CycB activity.
 
+   $\frac{d[\text{Cdc20}_T]}{dt} = k_5' + k_5'' \frac{([\text{CycB}]m J_5)^n}{1 + ([\text{CycB}]m J_5)^n} - k_6[\text{Cdc20}_T]$
+
+   Let's step back and take stock of what we have seen so far: The CycB
+   nullcline is only a function of Cdh1. The Cdh1 nullcline, however, is
+   a function of the *mass* and the activity of Cdc20 (called *A* in the previous section). 
+   We have now introduced a Cdc20 equation, which ties everythin together.
+   Now, instead of plotting three nullclines, Tyson and Novak use the Goldbeter-Koshland
+   expression to express Cdh1 as a function of CycB. So we have two expressions again,
+   The nullclines of CycB and Cdc20$_T$, and the only free parameter
+   is *mass*. (Since it is  computationally expensive to recompute these nullclines
+   for all mass values, a low and a high value of mass have been used to 
+   precompute the curves below.)
+
+   As you increase the mass from 0.4 to 1.0, notice the CycB nullcline
+   retract from the Cdh1 nullcline, towards the right. The G1 steady
+   state disappears, and the cell zooms to S/G2/M.
+ #+end_src
+ #+begin_src markdown :tangle markdown/cdh1-activation-2.md
+ Notice that as the mass increases to 1.0, the cell loops around the 
+ phase portrait - it is first attracted to the S/G2/M fixed point, and
+ then "automatically" returns to G1. 
+ #+end_src
+*** Section
+#+begin_src python
   def makeFig4(parameters):
-      with open('./markdown/cdh1-activation.md','r') as infile:
+      with open('./markdown/cdh1-activation-1.md','r') as infile:
           cdh1text = ''.join(infile.readlines())
       st.markdown(cdh1text)
       cycbvals = np.append(np.logspace(-6,-3,300),np.logspace(-3,1.1,600))
-      #mval = st.slider(label='Mass', key='massfig2nc',min_value=0.4, max_value=1., value=0.4,step=0.6)    
+      # Sliders
       mval = st.selectbox(label='Mass', options=[0.4, 0.8, 1.0])
       Cdh1_i = st.slider(label='Cdh1',key='cdh1fig4tc', min_value=0.0, max_value=1.0, value=0.87,step=0.05)
-      Cdc20_i = st.slider(label='Cdc20',key='cdc20fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.05)
-      CycB_i = st.slider(label='log(CycB)',key='cdh1fig4tc', min_value=-2., max_value=0.0, value=-1.8,step=0.01)
+      Cdc20_i = st.slider(label='Cdc20',key='cdc20fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.01)
+      CycB_i = st.slider(label='log(CycB)',key='cdh1fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.01)
+      ## 
       cdc20 = [cdc20ncfig4(c, mval, parameters) for c in cycbvals ]
       pvals = (parameters['k3d'] + parameters['k3dd']*np.array(cdc20))/(parameters['k4']*mval)
       cdh1 = [cdh1ncfig4(c, p, parameters) for c,p in zip(cycbvals, pvals)]
@@ -451,9 +597,6 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
               cycb1 = cycbnc_fig2(cdh1, parameters)
               cycb2 = cdh1nc_fig2(cdh1, parameters)
               solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
-              #solutions = getRoots(log10cycb1, cycb2)
-              # if len(solutions) >=1 and p>=0.265:
-              #    solutions = [s for s in solutions if s < 0.4] 
               for s in solutions:
                   hyst.append(cycb1[s])
                   cdc20vals.append(c)
@@ -467,8 +610,8 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       ax.set_ylabel('CycB')
       ax.set_ylim(0,1.0)
 
-      x0 = [Cdh1_i, 10**CycB_i, Cdc20_i]
-      tmax = 150
+      x0 = [Cdh1_i, CycB_i, Cdc20_i]
+      tmax = 50
       stepsize=0.01
       t = np.linspace(0 ,tmax, int(tmax/stepsize))
       parameters['m'] = mval
@@ -486,17 +629,42 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
       ax.plot(df['cdc20'], df['cycb'], 'k.', label='CycB nullcline')
       ax.plot(y[:,2], y[:,1],'r--')
       ax.set_xlim([0,settings[mval]['xmax']])
+      ax.annotate('S/G2/M',(0.6,0.15))
+      ax.annotate('G1',(0.051,0.05))
       ax.legend()
       st.pyplot()
       plt.close()
-      f, ax = plt.subplots(1,1)
-      ax.plot(t, y[:,0],label='cdh1')
-      ax.plot(t, y[:,1],label='cycb')
-      ax.plot(t, y[:,2],label='cdc20')
-      ax.legend()
-      st.pyplot()
+
+      with open('./markdown/cdh1-activation-2.md','r') as infile:
+          cdh1conclude = ''.join(infile.readlines())
+      st.markdown(cdh1conclude)
+
+      # f, ax = plt.subplots(1,1)
+      # ax.plot(t, y[:,0],label='cdh1')
+      # ax.plot(t, y[:,1],label='cycb')
+      # ax.plot(t, y[:,2],label='cdc20')
+      # ax.legend()
+      # st.pyplot()
 #+end_src
-** Full model
+** Primitive model
+*** Primitive model - description
+ #+begin_src markdown :tangle markdown/primitive.md
+ We are nearly there! To make our model a little more 
+ mechanistic, we will introduce two more variables
+
+ 1. Cdc20$_A$ will be the "active" form of Cdc20. In the model,
+    this will interact with Cdh1, instead of the Cdc20$_T$
+ 2. We introduce a hypothetical intermediary enzyme IEP, which
+    is required to introduce the delay seen in the rise of 
+    Cdc20$_T$.
+
+ Finally, we model the increase in mass as a logistic function
+ in order to smoothly vary the cell mass over a cell's life time.
+ Putting everything together, a primitive model of the cell cycle
+ is in place! This model demonstrates oscillations, under the condition
+ that the mass divides every time the cell completes mitosis, represented
+ here as when CycB drops below 0.1.
+ #+end_src
 *** definition
 #+begin_src python
   def fullmodel(X, t, args):
@@ -568,16 +736,340 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
 
 #+RESULTS:
 
-** Make introduction
+** Yeast model
+*** model definition
 #+begin_src python
-  def makeIntroPage():
-      with open('markdown/intro.md','r') as infile:
-          introtext = ''.join(infile.readlines())
-      #with open
-      #st.image()
-      st.markdown(introtext)
+  def yeastmodel(X, t, args):
+      parameters = args
+      k1 = args['k1']
+      k2d = args['k2d']
+      k2dd = args['k2dd']
+      k2ddd = args['k2ddd']
+      k3d = args['k3d']
+      k3dd = args['k3dd']
+      k4d = args['k4d']
+      k4 = args['k4']
+      A = args['A']
+      J3 = args['J3']
+      J4 = args['J4']
+      mu = args['mu']
+      J5 = args['J5']
+      Mad = args['Mad']
+      k6 = args['k6']
+      k7 = args['k7']
+      k8 = args['k8']
+      n = args['n']
+      k5d = args['k5d']
+      k5dd = args['k5dd']
+      J7 = args['J7']
+      J8 = args['J8']
+      mstar = args['mstar']
+      k9 = args['k9']
+      k10 = args['k10']
+      k11 = args['k11']
+      k12d = args['k12d']
+      k12dd = args['k12dd']
+      k12ddd = args['k12ddd']
+      k13 = args['k13']
+      k14 = args['k14']
+      k15d = args['k15d']
+      k15dd = args['k15dd']
+      k16d = args['k16d']
+      k16dd = args['k16dd']
+      Keq = args['Keq']
+      J15 = args['J15']
+      J16 = args['J16']
+      cdh1, cycbt, ckit, sk, cdc20t, cdc20a, iep, m = X
+      cycb = cycbt - trimer(cycbt, ckit, parameters)
+      dcdh1 = ((k3d + k3dd*cdc20a)*(1 - cdh1))/(J3 + 1 - cdh1) - ((k4d*sk + k4*m*cycb)*cdh1)/(J4 + cdh1)
+      dcycbt = k1- (k2d + k2dd*cdh1 + k2ddd*cdc20a)*cycbt    
+      dckit = k11 - (k12d + k12dd*sk + k12ddd*m*cycb)*ckit
+      dsk = k13*goldbeter(k15d*m + k15dd*sk, k16d + k16dd*m*cycb, J15, J16) - k14*sk
+      dcdc20t = k5d + k5dd*( (cycb*m/J5)**n /(1+ (cycb*(m/J5))**n )) - k6*cdc20t
+      dcdc20a = (k7*iep*(cdc20t-cdc20a)/(J7 + cdc20t - cdc20a)) - (k8*Mad*cdc20a)/(J8+cdc20a) - k6*cdc20a
+      diep = k9*m*cycb*(1-iep) - k10*iep
+      dm = mu*m*(1-m/mstar)
+      return np.array(([dcdh1, dcycbt, dckit, dsk, dcdc20t, dcdc20a, diep, dm]))
 #+end_src
-** Function calls
+*** nullclines
+#+begin_src python
+  def cdh1ncfig7(cycbt,ckit, cdc20a, m, sk, parameters):
+      cycb = cycbt - trimer(cycbt, ckit, parameters)
+      cdh1 = goldbeter(parameters['k3d'] + parameters['k3dd']*cdc20a,
+                       parameters['k4d']*sk + parameters['k4']*m*cycb,
+                       parameters['J3'],
+                       parameters['J4'])
+      return cdh1
+  def cycbncfig7(cdh1, cdc20a, parameters):
+      cycbt = parameters['k1']/(parameters['k2d'] + parameters['k2dd']*cdh1 + parameters['k2ddd']*cdc20a)
+      return cycbt
+
+  def ckitncfig7(cycbt, m, sk, parameters):
+      cycb = cycbt - trimer(cycbt, )
+      ckit = parameters['k11']/(parameters['k12d'] + parameters['k12dd']*sk + parameters['k12ddd']*m*cycb)
+      return ckit
+
+  def trimer(cycbt, ckit, parameters):
+      tri = (2*cycbt*ckit)/(cycbt + ckit + 1./parameters['Keq'] +\
+                               np.sqrt((cycbt + ckit + 1./parameters['Keq'])**2 -4*cycbt*ckit))
+      return tri
+#+end_src
+*** make phase portrait
+#+begin_src python
+  # def makeYeastPP(parameters):
+  #     # TODO: understand and implement nullclines in fig 7
+      # mval = st.slider('mass', min_value=0.1, max_value=1.0,step=0.1,value=0.2)
+      # mval = 1.0
+      # parameters['m'] = mval
+      # skval = st.slider('SK', min_value=-2., max_value=0.0,step=0.5,value=-2.)    
+      # # cycbt values over which to compute cdh1 nullcline
+      # cycbvals = np.append(np.logspace(-6,-3,300),np.logspace(-3,0.0,600))
+      # ckitnc = [ckitncfig7(c, mval, 10**skval, parameters) for c in cycbvals]
+      # ckitvals = np.linspace(0., 1., 100)
+      # cdc20vals = [cdc20ncfig4(c, mval, parameters) for c in cycbvals]
+      # pvals = (parameters['k3d'] + parameters['k3dd']*np.array(cdc20vals))/(parameters['k4']*mval)
+      # cdh1 = [cdh1ncfig4(c, p, parameters) for c,p in zip(cycbvals, pvals)]
+      # cycbnc = []
+      # ckitx = []
+      # for ckit in ckitvals:
+      #     cdh1vals = [cdh1ncfig7(c, ckit, cdc20, mval, skval, parameters) for c,cdc20 in zip(cycbvals,cdc20vals)]
+      #     cycb1 = cycbncfig7(np.array(cdh1vals), np.array(cdc20vals), parameters)
+      #     cycb2 = cdh1nc_fig2(np.array(cdh1vals), parameters)
+      #     roots = getRoots(np.log10(cycb1), np.log10(cycb2))
+      #     for r in roots:
+      #         cycbnc.append(r)
+      #         ckitx.append(ckit)
+      # #cycb = [cycbncfig7(c, 0, parameters) for c in cdh1vals]
+      # f, ax = plt.subplots(1,1)
+      # ax.plot(ckitnc, cycbvals)
+      # ax.plot(ckitx, cycbnc,'k.')
+      # ax.plot(ckitnc, [cycbt - trimer(cycbt,ckit,parameters ) for cycbt, ckit in zip(cycbvals, ckitnc)])
+      # ax.set_title(str(len(cycbnc)))
+      # # ax.set_xlim(0,1)
+      # # ax.set_ylim(0,1)
+      # ax.set_ylabel('[CycB$_T$]')    
+      # ax.set_xlabel('[CKI$_T$]')
+#+end_src
+*** Section
+#+begin_src python
+  def makeFig7(parameters):
+      ## time courses
+      parameters['mu'] = 0.005
+      x0 = [1.0, 0.01, 0.01, 0.04, 0.2,0.1, 0.2, 1.0]
+      tmax = 300
+      stepsize = 0.01
+      t = np.linspace(0, tmax , int(tmax/stepsize))
+      image = Image.open('data/yeast-model.png')
+      st.image(image, caption="Wiring diagram of the yeast cell cycle, "\
+               "taken from Tyson and Novak, 2001.", width=500)#use_column_width=True)
+      with open('markdown/yeast-model-1.md', 'r') as infile:
+          yeastdescription1 = ''.join(infile.readlines())
+
+      st.markdown(yeastdescription1)
+      strain  = st.selectbox(label='Select a yeast strain', options=['WT', 'SK-deletion','SK, CKI double deletion'])
+
+      if strain == 'WT':
+          pars = dict(parameters)
+      elif strain == 'SK-deletion':
+          pars = dict(parameters)
+          pars['k13'] = 0
+      elif strain == 'SK, CKI double deletion':
+          pars = dict(parameters)
+          pars['k13'] = 0
+          pars['k11'] = 0
+      y = integrate(yeastmodel,x0, t, pars, massindex=7, stepsize=stepsize)
+      f, ax = plt.subplots(2,1)
+      ax[0].plot(t, y[:,0],label='Cdh1')
+      ax[0].plot(t, y[:,1],label='Cycb$_T$')
+      ax[1].plot(t, y[:,2],label='Cki$_T$')
+      ax[1].plot(t, y[:,3],label='SK')
+      ax[1].plot(t, y[:,5],label='Cdc20$_A$')
+      ax[0].legend()
+      ax[1].legend()
+      ax[0].set_title(strain)
+      st.pyplot()
+      with open('markdown/yeast-model-2.md', 'r') as infile:
+          yeastdescription2 = ''.join(infile.readlines())
+      st.markdown(yeastdescription2)
+#+end_src
+*** Yeast model - description
+#+begin_src markdown :tangle markdown/yeast-model-1.md
+We have now put together a complete cell-cycle machine: the cell
+starts out in G1 phase (high Cdh1), and as the mass of the cell increases,
+the Cdc20 is activated. As a consequence, CycB rises rapidly, the cell is
+drawn to S/G2/M, leading to an increase in Cdh1. The cell finally divides,
+dropping the mass back to its initial value, and the G1 configuration is 
+readopted.
+
+In the budding yeast, a few other molecular players contribute to this story.
+The first, is the CycB/Cdk1 inhibitor/binding partner, denoted the *C*yclin
+dependent-*K*inase *I*nhibitor, or CKI. This molecule initially binds, and inactivates
+CycB/Cdk1 activity, but this inhibition decreases as the mass of the cell increases.
+Simultaneously, the cell "commits" to S-phase, known as the START transition; this
+is signaled by the activity of a "Starter Kinases" denoted SK, which are A-type cyclins,
+expressed in G1. (The expression of these cyclins, Cln1-2 in budding yeast,
+ on specific cell-cycle dependent transcription factors, SBF in budding yeast.)
+Please see Tyson and Novak, 2001 for a detailed discussion.
+
+Now that we have a complete yeast cell cycle model, we can start exploring
+results from genetic perturbation experiments. If the components that compose
+our model are indeed reflective of the underlysing biology, then we should be 
+able to "simulate" gene deletion phenotypes.
+
+Below is one such example: Consider a *cln1 cln2* strain, lacking the Starter Kinase.
+How do we expect such a mutant to behave? Examining the figure above, a SK-deletion
+would mean that CKI is never phosphorylated/degraded, which will mean that the cell
+will remain in G1 phase. In the model such a deletion would be represented by setting
+the parameter $k_{13}=0$. 
+
+Use the menu below to simulate an "SK-deletion", or a *cln1 cln2* strain. 
+#+end_src
+
+#+begin_src markdown :tangle markdown/yeast-model-2.md
+Notice that the cell-cycle oscillations completely vanish, and all the variables
+go to steady state! Now, examine these values: Cdh1 is high, CycB is low, CKI is (very) high.
+This looks like a cell in G1! We can then interpret, that the cell is in fact *arrested* in 
+G1, since the CKI will have to be degraded in order for the cell to progress into S/G2/M.
+
+If CKI is the agent responsible for this arrest, what would a *cln1 cln2* additionally lacking 
+CKI look like? (This mutant would be represented by setting the parameters $k_{13}=0, K_{11}=0$).
+Use the drop down menu to simulate this triple deletion strain.
+
+... and voila! the cell cycle oscillations resume! Thus, this strain is not only
+viable, it *rescues* the *cln1 cln2* G1 arrest phenotype!
+#+end_src
+** Summary
+*** text
+#+begin_src markdown :tangle markdown/summary.md
+It is now nearly two decades after the perspective piece by Tyson and Novak 
+was first published. The yeast cell cycle models have  have since been iteratively
+refined and expanded. The work by Tyson and Novak has expanded our understanding
+of this field, incorporating experimental observations meticulously into the model
+building process to ensure that the model remains biologically meaningful. 
+
+Below are some resources that might prove useful to anyone curious about the kind
+of effort that goes into creating such mechanistic models in biology
+
+1. For an exhaustive description of the molecular biology as well as a complete
+   description of the first budding yeast cell cycle model, I highly recommend the 
+   [page curated by Kathy Chen, from Tyson's group](http://mpf.biol.vt.edu/research/budding_yeast_model/pp/index.php)
+2. [Barik et al, 2016](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005230)
+   published a stochastic version of the cell cycle model
+3. [Kraikivski et al, 2015](https://www.nature.com/articles/npjsba201516)
+   published an extensive analysis 257 yeast cell cycle mutants, showing how the model
+   successfully explains a whole host of experimental observations
+
+Creating this site has been an exciting challenge for me. There is a lot of work
+to be done in improving the content on this site. Please feel free to reach out with
+any corrections or  suggestions, and do let me know if you found this site useful!
+
+All the models, parameters, and code used to create this site can be found on the [github repo](https://github.com/amoghpj/cell-cycle-models).
+
+Happy learning!
+#+end_src
+** Front page
+*** Intro - description
+ #+begin_src markdown :tangle markdown/intro.md
+   TLDR; This project seeks to make a series of abstract models of the
+   eukaryotic cell cycle accessble to non-modelers. The content is
+   organized as per the ideas developed in [Tyson and Novak,
+   2001](https://www.ncbi.nlm.nih.gov/pubmed/11371178).  This interactive
+   site is meant to be an educational tool, aimed at anyone who has been
+   exposed to the basic concepts of eukaroytic mitosis, and is curious
+   about the utility of mathematical models in making sense of complex
+   biological processes.
+
+
+   ## What are the cell cycle models all about?
+   All cells go through a cycle of events where they grow and divide:
+   when the cell judges that there is sufficient nutrition available in the
+   environment, it commits to duplicating its genome (S phase). Following 
+   a gap phase where the cell ensures that the DNA is not damaged(G2 phase),
+   the cell commits to dividing into two daughter cells. What follows is 
+   an intricate orchestra of cellular events: the genome is first condensed
+   into chromosomes, an elaborate microtubule spindle assembles around the nucleus,
+   which then pull apart the duplicated sister chromatids to the poles of the cell.
+   Finally, the entire cell divides, partitioning its organelles and cytoplasm
+   between its daughters. The daughter cell, at the end of mitosis, waits
+   to judge the environment, waiting in G1, waiting to commit to another cycle of growth
+   and division...
+
+   Underneath this clockwork of events lies a network of signals, molecular signals,
+   that act like semaphores, *committing* the cell to the next phase of the cell cycle.
+   How does this molecular network make these irreversible decisions? Tyson and Novak
+   explore this question in a series of mathematical models, adding molecular
+   complexity at each stage, investigating the origins of cellular decision making. 
+   Use the tabs on the left to explore them!
+
+   ## Why did you make this?
+   The prototypical mathematical model of biological systems still seems
+   to be the Lotka-Volterra predator-prey model, from the 20th
+   century. The curious student with an interest in molecular biology
+   ,*may* have come across the
+   [reprissilator](https://en.wikipedia.org/wiki/Repressilator).  I
+   believe that there is still a general lack of awareness of the success
+   of mathematical models of cellular processes, ranging from the cell
+   cycle, to circadian oscillations, to autophagy, and even dynamical
+   models of cancer.  While there are general purpose tools [Cell
+   Collective](https://cellcollective.org/#) that provide platforms to
+   lower the barrier to entry to these theoretical models, I have not
+   come across a curated, interactive resource exploring any of these
+   models in depth. This is my attempt at creating such a tool, focussed
+   on the highly successful work by Tyson and Novak in the last couple of
+   decades on the yeast cell cycle.
+
+   Please feel free to reach out with any feedback and comments!
+
+   email: jamogh [at] vt [dot] edu
+
+   twitter: [@amogh_jalihal](https://twitter.com/amogh_jalihal)
+
+   github: this project's [github repository](https://github.com/amoghpj/cell-cycle-models)
+ #+end_src
+*** Make introduction
+ #+begin_src python
+   def makeIntroPage():
+       # gifpath = r''' <img src="./data/budding.gif">''' # 
+       # st.write(gifpath, unsafe_allow_html=True)
+       with open('markdown/intro.md','r') as infile:
+           introtext = ''.join(infile.readlines())
+       #with open
+       #st.image()
+       st.markdown(introtext)
+ #+end_src
+*** Make pages
+#+begin_src python
+  def makePages(parameters):
+     page = st.sidebar.selectbox('Jump to...',['Introduction',
+                                               'Cdh1-CycB Antagonism',
+                                               'Hysteresis in transitions',
+                                               'Regulation of Cdh1/APC',
+                                               'A primitive model',
+                                               'The yeast cell cycle', 'Summary'])
+     if page == 'Introduction':
+         st.header('Introduction')
+         makeIntroPage()
+     if page == 'Cdh1-CycB Antagonism':
+         # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
+         makeFig2(parameters)
+     if page == 'Hysteresis in transitions':
+         st.header('Hystersis underlies cell state transitions')
+         makeFig3(parameters)
+     if page == 'Regulation of Cdh1/APC':
+         st.header('Activating the Cdh1/APC')
+         makeFig4(parameters)
+     if page == 'A primitive model':
+         st.header('Primitive Model')
+         plottimecourses(parameters)
+     if page == 'The yeast cell cycle':
+         st.header('The budding yeast cell cycle')
+         makeFig7(parameters)
+     if page == 'Summary':
+         st.header("...But there's more!")
+         summary()
+       
+#+end_src
+*** Setup
  #+begin_src python
    def main():
        # parameterdict
@@ -621,34 +1113,10 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
            'J16':0.01,
            'mstar':10,
        }
-
-       page = st.sidebar.selectbox('Jump to...',['Introduction',
-                                                 'Cdh1-CycB Antagonism',
-                                                 'Hysteresis in transitions',
-                                                 'Regulation of Cdh1/APC',
-                                                 'A primitive model',
-                                                 'The yeast cell cycle','test'])
-       if page == 'Introduction':
-           st.header('Introduction')
-           makeIntroPage()
-       if page == 'Cdh1-CycB Antagonism':
-           # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
-           makeFig2(parameters)
-       if page == 'Hysteresis in transitions':
-           st.header('Hystersis underlies cell state transitions')
-           makeFig3(parameters)
-       if page == 'Regulation of Cdh1/APC':
-           st.header('Activating the Cdh1/APC')
-           makeFig4(parameters)
-       if page == 'A primitive model':
-           st.header('Primitive Model')
-           plottimecourses(parameters)
-       if page == 'The yeast cell cycle':
-           st.header('The Yeast cell cycle')
-           st.markdown('under construction')
+       makePages(parameters)
            #plottimecourses(parameters)
-       if page == 'test':
-           st.header('test')
+       # if page == 'test':
+       #     st.header('test')
            #test()
    if __name__ == '__main__':
        main()
@@ -656,215 +1124,6 @@ Following cite:2001_JTB_Tyson_Antagonism_Hysteresis_Irreversible
 
  #+RESULTS:
 
-* Markdown Text
-** Intro
-#+begin_src markdown :tangle markdown/intro.md
-  TLDR; This project seeks to make a series of abstract models of the
-  eukaryotic cell cycle accessble to non-modelers. The content is
-  organized as per the ideas developed in [Tyson and Novak,
-  2001](https://www.ncbi.nlm.nih.gov/pubmed/11371178).  This interactive
-  site is meant to be an educational tool, aimed at anyone who has been
-  exposed to the basic concepts of eukaroytic mitosis, and is curious
-  about the utility of mathematical models in making sense of complex
-  biological processes.
-
-
-  ## What are the cell cycle models all about?
-  All cells go through a cycle of events where they grow and divide:
-  when the cell judges that there is sufficient nutrition available in the
-  environment, it commits to duplicating its genome (S phase). Following 
-  a gap phase where the cell ensures that the DNA is not damaged(G2 phase),
-  the cell commits to dividing into two daughter cells. What follows is 
-  an intricate orchestra of cellular events: the genome is first condensed
-  into chromosomes, an elaborate microtubule spindle assembles around the nucleus,
-  which then pull apart the duplicated sister chromatids to the poles of the cell.
-  Finally, the entire cell divides, partitioning its organelles and cytoplasm
-  between its daughters. The daughter cell, at the end of mitosis, waits
-  to judge the environment, waiting in G1, waiting to commit to another cycle of growth
-  and division...
-
-  Underneath this clockwork of events lies a network of signals, molecular signals,
-  that act like semaphores, *committing* the cell to the next phase of the cell cycle.
-  How does this molecular network make these irreversible decisions? Tyson and Novak
-  explore this question in a series of mathematical models, adding molecular
-  complexity at each stage, investigating the origins of cellular decision making. 
-  Use the tabs on the left to explore them!
-
-  ## Why did you make this?
-  The prototypical mathematical model of biological systems still seems
-  to be the Lotka-Volterra predator-prey model, from the 20th
-  century. The curious student with an interest in molecular biology
-  ,*may* have come across the
-  [reprissilator](https://en.wikipedia.org/wiki/Repressilator).  I
-  believe that there is still a general lack of awareness of the success
-  of mathematical models of cellular processes, ranging from the cell
-  cycle, to circadian oscillations, to autophagy, and even dynamical
-  models of cancer.  While there are general purpose tools [Cell
-  Collective](https://cellcollective.org/#) that provide platforms to
-  lower the barrier to entry to these theoretical models, I have not
-  come across a curated, interactive resource exploring any of these
-  models in depth. This is my attempt at creating such a tool, focussed
-  on the highly successful work by Tyson and Novak in the last couple of
-  decades on the yeast cell cycle.
-
-  Please feel free to reach out with any feedback and comments!
-
-  email: jamogh [at] vt [dot] edu
-
-  twitter: [@amogh_jalihal](https://twitter.com/amogh_jalihal)
-
-  github: this project's [github repository](https://github.com/amoghpj/cell-cycle-models)
-#+end_src
-** two variable model
-#+begin_src markdown :tangle markdown/two-variable-timecourse.md
-## The CycB/Cdk1-Cdh1/APC antagonism
-We'll start at the end, the exit from mitosis. 
-
-There are two players that coordinate the end of cell division, and the
-entry into G1, namely the CycB-bound Cdk1 [kinase](https://www.uniprot.org/keywords/KW-0418), 
-and the Cdh1 bound APC [ubiquitin ligase](https://www.sciencedirect.com/topics/neuroscience/anaphase-promoting-complex)
-The rise in activity of the CycB/Cdk1 kinase pushes the 
-cell into mitosis, spcifically into the S/G2/M phases. CycB/Cdk1
-phosphorylate Cdh1 and prevent its binding to APC. In opposition,
-Cdh1/APC target CycB/Cdk1 for degradation. The switch from S/G2/M to
-G1 phase happens when CycB/Cdk1 is degraded, and Cdh1/APC activity is high.
-
-
-These opposing forces can be modeled using a pair of non-linear ODEs, with kinetic
-parameters: the *k*s are rate constants, and the *J*s are the Michaelis constants.
-
-$\frac{d[\text{CycB}]}{dt} = k_1 - (k_2' + k_2'' [\text{Cdh1}])[\text{CycB}]$
-
-$\frac{d[\text{Cdh1}]}{dt} = \frac{(k_3' + k_3'' A)(1- [\text{Cdh1}])}{J_3 + 1 - [\text{Cdh1}]} - \frac{k_4 m [\text{CycB}] [\text{Cdh1}]}{J_4 + [\text{Cdh1}]}$
-
-Notice the *m* in the Cdh1 equation: it denotes the *mass* of the cell. 
-The numerical solution of the above equations, the timecourses of Cdh1 (solid) and CycB (dashed),
- are plotted below. Notice the logarithmic scale of CycB activity.
-The default values of these sliders (high Cdh1, low CycB, low mass) indicate that
-the cell has just divided. Try increasing the mass to, and beyond, a value of 0.53.
-To get a sense of how the mass affects the *dynamics* of these two opposing 
-molecular factors, use the sliders to set the initial conditions of Cdh1, and CycB, and
-vary the mass to see where these requlators end up at the end of the time course.
-#+end_src
-#+begin_src markdown :tangle markdown/two-variable-nullcline.md
-  You will notice that there is a dramatic switch when mass hits a threshold,
-   suddenly CycB shoots up, and Cdh1 goes down. At this point the cell has
-  committed to the S/G2/M phases, and is ready to divide. But since division
-  results in the *mass* of the cell dividing into its daughters, use the slider
-  to set *m* to a low value  again. Notice that the configurations of CycB and Cdh1
-  have flipped again.
-
-  The exercise above shows the effect of mass on the CycB-Cdh1
-  antagonism.  In order to get a sense of how this two-component system
-  behaves in general, the plot below shows the nullclines of this
-  system, that is, how Cdh1 (red) and CycB (blue) behave at steady
-  state. The intersection of these curves (green dots) indicate the
-  "fixed points" of the system, i.e. any trajectory will either be
-  attracted to, or repelled by these points. Initially, the system has
-  three "solutions": The one on the right is the G1 attractor. (It is an
-  attractor, becasue the trajectory (starting at high Cdh1, low CycB,
-  low mass) ends up falling into the green point). The one on the left
-  is the S/G2/M attractor. 
-
-  Use the sliders to increase the mass slowly, and observe the behavior of
-  the green dots, and the trajectory (dashed line). Is the fixed point in 
-  the middle an attractor or a repeller? What does the stability of this point
-  mean for the two other fixed points?
-#+end_src
-
-#+begin_src markdown :tangle markdown/two-variable-conclusion.md
-You should see the two fixed points on the right collide and disappear, at which
-point the trajectory again dramatically slides along the Cdh1 nullcline, and
-falls into the S/G2/M state.
-
-Notice how the solutions of the intersecting nullclines depend on the value of the mass.
-In the next section, we will plot these possible solutions directly as a function
-of increase mass.
-#+end_src
-
-** hysteresis
-#+begin_src markdown :tangle markdown/hysteresis-1.md
-To get a better picture of how mass affects the 
-steady states of the system, the plot below shows
-the CycB steady states as a function of the combination
-of parameters and mass below.
-
-$p = (k3d + k3dd*A)/(k4*m)$
-
-Notice that *p* decreases as *m* increases, while *p* increases
-with the parameter *A*, which we haven't talked about yet.
-
-The reverse S shape of this plot indicates the hysteresis
-in CycB activity: immediately after mitosis, the cell lies
-in the bottom right corner. As mass increases, the system
-moves to the left, until the G1 state disappears, and the
-cell zooms up to the S/G2/M state. 
-
-Use the sliders below to first increase the mass to see the
-first irreversible decision to S/G2/M
-#+end_src
-
-#+begin_src markdown :tangle markdown/hysteresis-2.md
-The cell is now undergoing mitosis. In order for it to
-complete division and return to the G1 branch, the cell has
-to fall off S/G2/M branch on the right. For this to happen,
-it has to travel along this branch on the top, going to the
-right. How does this happen? The mystery variable *A* takes
-care of this. It represents the separation of chromatids, and
-progress through anaphase. In the next section, we will introduce
-another variable to represent this process, which will drive
-the cell through cell division, causing it to fall off the 
-S/G2/M branch *irreversibly* back to G1. Test this for yourself
-by selecting a high CycB, low Cdh1 initial condition, and watch the
-cell fall back to G1.
-#+end_src
-** cdh1 activation
-#+begin_src markdown :tangle markdown/cdh1-activation.md
-  In the previous section, we had introduced an artificial 
-  variable *A* that controls the exit from mitosis. This 
-  variable acted as an activator of the Cdh1/APC activity.
-  The Cdc14 phosphatase plays this role, which is activated
-  indirectly by Cdc20/APC. Tyson and Novak simplify this
-  mechanism, by directly considering the Cdc20 activity.
-  The following equation models the rise in Cdc20/APC
-  activity in the S/G2/M phase by introducing a Hill-like
-  dependence on CycB activity.
-
-  $\frac{d[\text{Cdc20}_T]}{dt} = k_5' + k_5'' \frac{([\text{CycB}]m J_5)^n}{1 + ([\text{CycB}]m J_5)^n} - k_6[\text{Cdc20}_T]$
-
-  Let's step back and take stock of what we have seen so far: The CycB
-  nullcline is only a function of Cdh1. The Cdh1 nullcline, however, is
-  a function of the *mass* and the activity of Cdc20 (called *A* in the previous section). 
-  We have now introduced a Cdc20 equation, which ties everythin together.
-  Now, instead of plotting three nullclines, Tyson and Novak use the Goldbeter-Koshland
-  expression to express Cdh1 as a function of CycB. So we have two expressions again,
-  The nullclines of CycB and Cdc20$_T$, and the only free parameter
-  is *mass*. (Since it is  computationally expensive to recompute these nullclines
-  for all mass values, a low and a high value of mass have been used to 
-  precompute the curves below.)
-
-  As you increase the mass from 0.4 to 1.0, notice the CycB nullcline
-  retract from the Cdh1 nullcline, towards the right. The G1 steady
-  state disappears, and the cell zooms to S/G2/M.
-#+end_src
-** Primitive model
-#+begin_src markdown :tangle markdown/primitive.md
-We are nearly there! To make our model a little more 
-mechanistic, we will introduce two more variables
-
-1. Cdc20$_A$ will be the "active" form of Cdc20. In the model,
-   this will interact with Cdh1, instead of the Cdc20$_T$
-2. We introduce a hypothetical intermediary enzyme IEP, which
-   is required to introduce the delay seen in the rise of 
-   Cdc20$_T$.
-
-Finally, we model the increase in mass as a logistic function
-in order to smoothly vary the cell mass over a cell's life time.
-Putting everything together, a primitive model of the cell cycle
-is in place! This model demonstrates oscillations, under the condition
-that the mass divides every time the cell completes mitosis, represented
-here as when CycB drops below 0.1.
-#+end_src
 * [5/6] Tasks
 - [X] Make function to toggle phase plane
   - This doesn't really work in the log space plot.
