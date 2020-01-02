@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 from scipy.integrate import odeint
+from scipy.interpolate import splprep, splev
 from io import BytesIO
 import streamlit as st
 from PIL import Image
@@ -112,14 +114,14 @@ def makePP(model, xlim, ylim, ax, gridsize,args):
                      alpha=0.3,
                      length_includes_head=False)
 
-def getRoots(y1, y2):
+def getRoots(y1, y2, eps=0.05):
     err = [abs(y1[i] - y2[i]) for i in range(len(y1))]
     winsize = 2
     differr = [(err[i+winsize] - err[i])/winsize for i in range(len(err)-winsize)]
     solutions = []
 
     for i in range(len(differr)-winsize):
-        if err[i+winsize] < 0.05 and err[i] < 0.05:
+        if err[i+winsize] < eps and err[i] < eps:
             if differr[i + winsize] >0 and differr[i] < 0 :
                 solutions.append(i+1)
 
@@ -388,8 +390,17 @@ def makeFig4(parameters):
         cdh1text = ''.join(infile.readlines())
     st.markdown(cdh1text)
     cycbvals = np.append(np.logspace(-6,-3,300),np.logspace(-3,1.1,600))
+    prefix = './data/hyst-cdc20-'
+    suffix = '-m.dat'
+    settings = {0.4:{'fname':'lo','xmax':0.5},
+                0.6:{'fname':'mid-lo','xmax':0.75},
+                0.8:{'fname':'mid-hi','xmax':1.0},
+                1.0:{'fname':'hi','xmax':1.0}}
+
     # Sliders
-    mval = st.selectbox(label='Mass', options=[0.4, 0.8, 1.0])
+    #mval = st.selectbox(label='Mass', options=[0.4, 0.6, 0.8, 1.0])
+    minput = st.slider(label='Mass',min_value=0.4, max_value=1.0, step=0.2,value=0.4)
+    mval = round(minput, 2)
     Cdh1_i = st.slider(label='Cdh1',key='cdh1fig4tc', min_value=0.0, max_value=1.0, value=0.87,step=0.05)
     Cdc20_i = st.slider(label='Cdc20',key='cdc20fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.01)
     CycB_i = st.slider(label='log(CycB)',key='cdh1fig4tc', min_value=0.0, max_value=1.0, value=0.01,step=0.01)
@@ -398,9 +409,9 @@ def makeFig4(parameters):
     pvals = (parameters['k3d'] + parameters['k3dd']*np.array(cdc20))/(parameters['k4']*mval)
     cdh1 = [cdh1ncfig4(c, p, parameters) for c,p in zip(cycbvals, pvals)]
     cycb = cycbnc_fig2(cdh1, parameters)
-    #mval = 0.8
+    # mval = 0.4
     regenerate = False
-    cdh1vals = np.linspace(0.0,1.0, 600)
+    cdh1vals = np.linspace(0.0,1.0, 150)
     if regenerate == True:
         hyst = []
         pvals = []
@@ -410,13 +421,13 @@ def makeFig4(parameters):
             parameters['A'] = c
             cycb1 = cycbnc_fig2(cdh1, parameters)
             cycb2 = cdh1nc_fig2(cdh1, parameters)
-            solutions = getRoots(np.log10(cycb1), np.log10(cycb2))
+            solutions = getRoots(np.log10(cycb1), np.log10(cycb2),eps=1e-2)
             for s in solutions:
                 hyst.append(cycb1[s])
                 cdc20vals.append(c)
         vals = np.array([[c, h] for c,h in zip(cdc20vals, hyst)])
         df = pd.DataFrame(vals,columns=['cdc20','cycb'])
-        df.to_csv('data/hyst-cdc20-mid-m.dat')
+        df.to_csv(prefix + settings[mval]['fname'] + suffix)
 
     f, ax = plt.subplots(1,1)
     ax.plot(cdc20, cycbvals, 'k--',label='Cdh1 nullcline')
@@ -430,17 +441,14 @@ def makeFig4(parameters):
     t = np.linspace(0 ,tmax, int(tmax/stepsize))
     parameters['m'] = mval
 
-    #y = integrate(threevariable, x0, t, parameters, stepsize=stepsize)
     y = odeint(threevariable, x0, t, args=(parameters,))
 
-    fname = './data/hyst-cdc20-lo-m.dat'
-    xmax = 0.5
-    settings = {0.4:{'fname':'./data/hyst-cdc20-lo-m.dat','xmax':0.5},
-                0.8:{'fname':'./data/hyst-cdc20-mid-m.dat','xmax':1.0},
-                1.0:{'fname':'./data/hyst-cdc20-hi-m.dat','xmax':1.0}}
+    df = pd.read_csv(prefix + settings[mval]['fname'] + suffix)
+    df.sort_values(by='cycb',inplace=True)
+    tck, u = splprep([df['cdc20'].values, df['cycb'].values], s=0.0009)
+    smoothnc = splev(u,tck)
+    ax.plot(smoothnc[0], smoothnc[1],'k-')
 
-    df = pd.read_csv(settings[mval]['fname'])
-    ax.plot(df['cdc20'], df['cycb'], 'k.', label='CycB nullcline')
     ax.plot(y[:,2], y[:,1],'r--')
     ax.set_xlim([0,settings[mval]['xmax']])
     ax.annotate('S/G2/M',(0.6,0.15))
@@ -677,8 +685,9 @@ def summary():
     st.markdown(summarytext)
 
 def makeIntroPage():
-    # gifpath = r''' <img src="./data/budding.gif">''' # 
-    # st.write(gifpath, unsafe_allow_html=True)
+
+    gifpath = r'''<center> <img src="https://www.dropbox.com/s/b8hzu7ft3p1rrua/budding.gif?dl=1"><br> Credit: <a href="http://ameyajalihal.github.io">Ameya Jalihal</a></center><br>''' 
+    st.write(gifpath, unsafe_allow_html=True)
     with open('markdown/intro.md','r') as infile:
         introtext = ''.join(infile.readlines())
     #with open
@@ -686,6 +695,7 @@ def makeIntroPage():
     st.markdown(introtext)
 
 def makePages(parameters):
+
    page = st.sidebar.selectbox('Jump to...',['Introduction',
                                              'Cdh1-CycB Antagonism',
                                              'Hysteresis in transitions',
@@ -693,8 +703,8 @@ def makePages(parameters):
                                              'A primitive model',
                                              'The yeast cell cycle', 'Summary'])
    if page == 'Introduction':
-       st.header('Introduction')
-       makeIntroPage()
+          st.title("An Introduction to Cell Cycle Models")
+          makeIntroPage()
    if page == 'Cdh1-CycB Antagonism':
        # st.header('A simplified model of CycB/Cdk1-Cdh1/APC antagonism')
        makeFig2(parameters)

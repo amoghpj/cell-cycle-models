@@ -1,4 +1,4 @@
-TLDR; This project seeks to make a series of abstract models of the
+**TLDR;** This project seeks to make a series of abstract models of the
 eukaryotic cell cycle accessble to non-modelers. The content is
 organized as per the ideas developed in [Tyson and Novak,
 2001](https://www.ncbi.nlm.nih.gov/pubmed/11371178).  This interactive
