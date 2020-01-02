@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 from scipy.integrate import odeint
 from scipy.interpolate import splprep, splev
 from io import BytesIO
